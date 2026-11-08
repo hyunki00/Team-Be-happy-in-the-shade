@@ -1,0 +1,19 @@
+# 환경 변수 (비밀번호 · 서버 주소) - 절대 올리지 않기
+.env
+.env.*
+
+# 프론트엔드
+node_modules/
+dist/
+
+# 백엔드 (Python)
+venv/
+.venv/
+__pycache__/
+*.pyc
+
+# 에디터 · OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

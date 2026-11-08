@@ -1,122 +1,70 @@
-import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import './App.css'
+// 담당: 조현기
+// 라우터 설정 + 모든 페이지에 공통으로 들어가는 레이아웃
+import { createBrowserRouter, RouterProvider, Outlet } from "react-router-dom";
+import { AuthProvider } from "./contexts/AuthContext";
+import NavBar from "./components/NavBar";
+import ProtectedRoute from "./components/ProtectedRoute";
 
-function App() {
-  const [count, setCount] = useState(0)
+import HomePage from "./pages/HomePage";
+import LoginPage from "./pages/LoginPage";
+import SignUpPage from "./pages/SignUpPage";
+import MyPage from "./pages/MyPage";
+import FridgePage from "./pages/FridgePage";
+import RecipeListPage from "./pages/RecipeListPage";
+import RecipeRecommendPage from "./pages/RecipeRecommendPage";
+import RecipeDetailPage from "./pages/RecipeDetailPage";
+import RecipeCreatePage from "./pages/RecipeCreatePage";
+import RecipeEditPage from "./pages/RecipeEditPage";
+import BoardListPage from "./pages/BoardListPage";
+import BoardDetailPage from "./pages/BoardDetailPage";
+import BoardFormPage from "./pages/BoardFormPage";
+import NotFoundPage from "./pages/NotFoundPage";
 
+// 1. 공통 레이아웃
+// AuthProvider 안에서 useNavigate를 쓰기 때문에 라우터 안쪽(여기)에서 감싼다. (mini와 같음)
+const RootLayout = () => {
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+    <AuthProvider>
+      <NavBar />
+      <main>
+        <Outlet /> {/* 페이지 내용이 바뀔 자리 */}
+      </main>
+    </AuthProvider>
+  );
+};
 
-      <div className="ticks"></div>
+// 2. 라우터 설정 (경로는 컴포넌트 정리 문서 기준)
+// /recipes/recommend, /recipes/new 는 /recipes/:id 보다 위에 둔다.
+const router = createBrowserRouter([
+  {
+    path: "/",
+    element: <RootLayout />,
+    children: [
+      { index: true, element: <HomePage /> },
+      { path: "login", element: <LoginPage /> },
+      { path: "signup", element: <SignUpPage /> },
+      { path: "mypage", element: <ProtectedRoute><MyPage /></ProtectedRoute> },
+      { path: "fridge", element: <ProtectedRoute><FridgePage /></ProtectedRoute> },
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
+      { path: "recipes", element: <RecipeListPage /> },
+      { path: "recipes/recommend", element: <RecipeRecommendPage /> },
+      { path: "recipes/new", element: <ProtectedRoute><RecipeCreatePage /></ProtectedRoute> },
+      { path: "recipes/:id", element: <RecipeDetailPage /> },
+      { path: "recipes/:id/edit", element: <ProtectedRoute><RecipeEditPage /></ProtectedRoute> },
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
-}
+      { path: "board", element: <BoardListPage /> },
+      { path: "board/new", element: <ProtectedRoute><BoardFormPage /></ProtectedRoute> },
+      { path: "board/:id", element: <BoardDetailPage /> },
+      { path: "board/:id/edit", element: <ProtectedRoute><BoardFormPage /></ProtectedRoute> },
 
-export default App
+      { path: "*", element: <NotFoundPage /> },
+    ],
+  },
+]);
+
+// 3. App에서는 RouterProvider만 리턴
+const App = () => {
+  return <RouterProvider router={router} />;
+};
+
+export default App;

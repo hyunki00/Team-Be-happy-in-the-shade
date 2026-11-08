@@ -22,3 +22,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# 환경 변수 (비밀번호 · 서버 주소) - 절대 올리지 않기
+.env
+.env.*
