@@ -5,7 +5,7 @@
 /* eslint-disable react-refresh/only-export-components */
 import { useState, createContext, useContext } from "react";
 import { useNavigate } from "react-router-dom";
-import { NICKNAME_MIN, PASSWORD_MIN } from "../constants";
+import { LOGIN_ID_MIN, LOGIN_ID_MAX, NICKNAME_MIN, PASSWORD_MIN } from "../constants";
 import { mockUser } from "../mockData";
 
 // 개발용 가짜 로그인: true로 바꾸면 로그인한 상태(mockUser)로 시작한다.
@@ -18,21 +18,26 @@ const AuthContext = createContext(null);
 export const AuthProvider = ({ children }) => {
   const [error, setError] = useState("");
   const [isAuthenticated, setIsAuthenticated] = useState(DEV_LOGIN);
-  const [user, setUser] = useState(DEV_LOGIN ? mockUser : null); // { user_id, email, nickname }
+  const [user, setUser] = useState(DEV_LOGIN ? mockUser : null); // { user_id, login_id, email, nickname }
   const navigate = useNavigate();
 
-  // 로그인: 성공하면 true
-  const login = async (email, password) => {
+  // 로그인: 아이디 + 비밀번호, 성공하면 true (이메일은 회원가입 인증 · 비밀번호 찾기에만 씀)
+  const login = async (login_id, password) => {
     setError("");
     // TODO 백엔드 시작 시 추가
-    // const response = await api.post("/auth/login", { email, password });
+    // const response = await api.post("/auth/login", { login_id, password });
     // 성공하면 setUser(response.data), setIsAuthenticated(true), verifyJWT()
-    console.log("login", email, password);
+    console.log("login", login_id, password);
     return false;
   };
 
   // 회원가입: 입력값을 먼저 확인하고, 성공하면 true
-  const signup = async ({ email, nickname, password, confirmPassword }) => {
+  const signup = async ({ login_id, email, nickname, password, confirmPassword }) => {
+    const idPattern = new RegExp(`^[A-Za-z0-9]{${LOGIN_ID_MIN},${LOGIN_ID_MAX}}$`);
+    if (!idPattern.test(login_id)) {
+      setError(`아이디는 영문 · 숫자 ${LOGIN_ID_MIN}~${LOGIN_ID_MAX}자로 입력하세요.`);
+      return false;
+    }
     if (!email.includes("@")) {
       setError("유효한 이메일을 입력하세요.");
       return false;
@@ -51,7 +56,7 @@ export const AuthProvider = ({ children }) => {
     }
     setError("");
     // TODO 백엔드 시작 시 추가
-    // const response = await api.post("/auth/signup", { email, nickname, password });
+    // const response = await api.post("/auth/signup", { login_id, email, nickname, password });
     return false;
   };
 

@@ -71,9 +71,11 @@ export const COMMENT_MAX = 500; // (가안)
 
 // ── 회원 ────────────────────────────────
 
+export const LOGIN_ID_MIN = 4; // 로그인 아이디: 영문 · 숫자 4~20자 (와이어프레임 8장)
+export const LOGIN_ID_MAX = 20;
 export const NICKNAME_MIN = 2;
 export const NICKNAME_MAX = 20; // (가안, DB는 50자)
-export const PASSWORD_MIN = 6; // 예시 프로젝트(mini)와 같음
+export const PASSWORD_MIN = 8; // 8자 이상 (와이어프레임 8장)
 
 // ── 사진 ────────────────────────────────
 

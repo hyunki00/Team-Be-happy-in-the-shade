@@ -11,7 +11,8 @@ const IMG = (text) => `https://placehold.co/400x300?text=${text}`;
 // AuthContext의 DEV_LOGIN을 true로 바꾸면 이 사용자로 로그인한 상태가 된다.
 export const mockUser = {
   user_id: 1,
-  email: "user1@test.com",
+  login_id: "user1", // 로그인 아이디 (영문 · 숫자 4~20자)
+  email: "user1@test.com", // 회원가입 인증 · 비밀번호 찾기용
   nickname: "요리왕유빈",
 };
 

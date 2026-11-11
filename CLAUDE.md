@@ -97,6 +97,7 @@ frontend/src/
 
 - `App.jsx`: `createBrowserRouter` + `RouterProvider`, 공통 레이아웃 `RootLayout` 안에 `NavBar` + `<Outlet />`.
 - `AuthContext.jsx`: `AuthProvider`와 `useAuth`를 내보낸다. 값은 `user`, `isAuthenticated`, `error`, `setError`, `login`, `signup`, `logout`.
+- 로그인은 **아이디(`login_id`, 영문 · 숫자 4~20자) + 비밀번호(8자 이상)**. 이메일은 회원가입 인증번호와 비밀번호 찾기에만 쓴다. `login(login_id, password)`.
 - 서버 요청은 axios 인스턴스 하나(`baseURL: import.meta.env.VITE_API_URL`, `withCredentials: true`)로만 한다. 페이지마다 axios를 새로 만들지 않는다.
 - 알림 · 확인창은 sweetalert2로 mini의 `showSuccessAlert`, `showErrorAlert`, `showConfirmDialog`, `handleAuthError` 방식을 쓴다.
 - 서버 요청용 파일과 알림 함수 파일은 아직 위치를 정하지 않았다 (백엔드 시작 때). 필요하면 만들기 전에 물어본다.
@@ -169,7 +170,7 @@ mini의 오타(`serivces`, `alertUtiles`, `LootLayout`)는 따라 하지 않고 
 - 모델 파일은 복수형(`recipes.py`), crud · service · router 파일은 단수형(`recipe.py`).
 - scheme 클래스는 모델명 + `Create` · `Update` · `Read`. crud 메서드는 `get_by_id` · `create` · `update_by_id` · `delete_by_id`.
 - DB 이름은 11/6 최신 DB 설계서(테이블 생성 SQL) 기준. 헷갈리기 쉬운 것:
-  - `users`: `nickname` (username 아님), `created_at`
+  - `users`: `login_id`(로그인 아이디, DB에 추가 예정), `email`(인증용), `nickname` (username 아님), `created_at`
   - `user_ingredients.amount`는 문자열(VARCHAR)
   - `recipes`: 소개글은 `intro`(200자), `tool_id`(필요 조리도구) 필수, `level`은 초급 · 중급 · 고급
   - `posts`: `title`, `content` / `post_images`: `image_id`, `image_url`, `image_order` / 게시글 좋아요 테이블은 `posts_likes`
