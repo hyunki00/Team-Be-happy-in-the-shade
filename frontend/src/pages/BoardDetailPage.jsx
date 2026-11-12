@@ -1,5 +1,5 @@
 // 담당: 임유빈
-// 커뮤니티 게시물 상세페이지 [임시코드 - 아직 수정중]
+// 커뮤니티 게시물 상세페이지 [아직 수정중]
 
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -27,7 +27,7 @@ export default function BoardDetailPage({ posts = mockPosts, onDeletePost }) {
 
   // 댓글 입력 상태
   const [newComment, setNewComment] = useState('');
-  
+
   // 댓글 수정 상태 (pc_id : 수정 중인 텍스트)
   const [editingCommentId, setEditingCommentId] = useState(null);
   const [editText, setEditText] = useState('');
@@ -133,7 +133,7 @@ export default function BoardDetailPage({ posts = mockPosts, onDeletePost }) {
           className="text-sm font-medium text-gray-600 hover:text-gray-900 flex items-center gap-1"
         >
           ← 목록으로
-        </button>
+        </button> 
         {isMyPost && (
           <div className="flex gap-2 text-sm">
             <button
@@ -155,7 +155,7 @@ export default function BoardDetailPage({ posts = mockPosts, onDeletePost }) {
 
       {/* 시안 C 메인 레이아웃 (사진 유무에 따라 분기) */}
       <div className={`grid grid-cols-1 ${hasImages ? 'lg:grid-cols-2' : 'lg:grid-cols-1'} gap-8 bg-white border rounded-xl overflow-hidden shadow-sm`}>
-        
+
         {/* 왼쪽: 사진 영역 (mockData의 image_url 속성 사용) */}
         {hasImages && (
           <div className="bg-gray-100 flex flex-col justify-center items-center relative min-h-[350px] lg:min-h-[550px]">
@@ -192,18 +192,13 @@ export default function BoardDetailPage({ posts = mockPosts, onDeletePost }) {
 
         {/* 오른쪽 (또는 단독): 본문 및 댓글 영역 */}
         <div className="flex flex-col h-full p-6 lg:p-8">
-          
+
           {/* 게시글 정보 및 본문 헤더 */}
           <div className="border-b pb-6 mb-6">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="bg-gray-100 text-gray-700 text-xs px-2.5 py-1 rounded font-medium">
-                요리 후기
-              </span>
-            </div>
             <h1 className="text-2xl font-bold text-gray-900 mb-3">{post.title}</h1>
             <div className="flex justify-between items-center text-sm text-gray-500">
               <span className="font-semibold text-gray-800">{post.nickname}</span>
-              <span>{post.created_at} · 조회 41</span>
+              <span>{post.created_at} · 조회 {post.view_count || 0}</span>
             </div>
           </div>
 
@@ -211,6 +206,25 @@ export default function BoardDetailPage({ posts = mockPosts, onDeletePost }) {
           <div className="text-gray-800 text-base leading-relaxed whitespace-pre-wrap mb-8 flex-1 min-h-[120px]">
             {post.content}
           </div>
+          
+          {/* 관련 레시피 박스 클릭 시 해당 레시피 상세 페이지로 이동 */}
+          {post.linked_recipe && (
+            <div 
+              onClick={() => navigate(`/recipe/${post.linked_recipe.recipe_id}`)}
+              className="mb-6 p-4 bg-gray-50 border rounded-xl flex items-center justify-between cursor-pointer hover:bg-gray-100 transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-gray-200 rounded-lg overflow-hidden shrink-0">
+                  <img src={post.linked_recipe.image_url || 'https://placehold.co/100'} alt="레시피" className="w-full h-full object-cover" />
+                </div>
+                <div>
+                  <span className="text-xs text-gray-500 font-medium">관련 레시피</span>
+                  <p className="text-sm font-bold text-gray-900">{post.linked_recipe.recipe_title}</p>
+                  <p className="text-xs text-gray-500">{post.linked_recipe.nickname} · {post.linked_recipe.cooking_time}분 · {post.linked_recipe.level}</p>
+                </div>
+              </div>
+            </div>
+          )}        
 
           {/* 좋아요 버튼 영역 */}
           <div className="flex justify-center pb-6 border-b">
@@ -256,8 +270,7 @@ export default function BoardDetailPage({ posts = mockPosts, onDeletePost }) {
             {/* 댓글 목록 (스크롤 영역) */}
             <div className="space-y-4 max-h-[300px] overflow-y-auto pr-1">
               {comments.length > 0 ? (
-                comments.map((c) => {
-                  const isMyComment = user && c.user_id === user.user_id;
+                comments.map((c) => {  
                   return (
                     <div key={c.pc_id} className="p-3 bg-gray-50 rounded-lg border text-sm">
                       <div className="flex justify-between items-center mb-1">
@@ -285,7 +298,7 @@ export default function BoardDetailPage({ posts = mockPosts, onDeletePost }) {
                         </div>
                       </div>
 
-                      {/* 댓글 수정 모드 vs 일반 보기 모드 */}
+                          {/* 댓글 수정 모드 vs 일반 보기 모드 */}
                       {editingCommentId === c.pc_id ? (
                         <div className="mt-2 space-y-2">
                           <textarea

@@ -71,40 +71,35 @@ export default function BoardListPage({ posts = mockPosts }) {
 
       {/* 정렬 탭 & 검색바 영역 */}
       <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4 mb-6">
-        {/* 정렬 탭 (최신순 / 인기순) */}
+        {/* 정렬 탭 (BOARD_SORT 상수 기반 동적 렌더링) */}
         <div className="flex gap-2 border-b sm:border-b-0 pb-2 sm:pb-0">
-          <button
-            onClick={() => setSortType('latest')}
-            className={`px-3 py-1.5 text-sm font-semibold rounded-full transition-colors ${
-              sortType === 'latest'
-                ? 'bg-gray-900 text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
-          >
-            최신순
-          </button>
-          <button
-            onClick={() => setSortType('popular')}
-            className={`px-3 py-1.5 text-sm font-semibold rounded-full transition-colors ${
-              sortType === 'popular'
-                ? 'bg-gray-900 text-white'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
-          >
-            인기순
-          </button>
+          {BOARD_SORT.map((sort) => (
+            <button
+              key={sort.value}
+              onClick={() => setSortType(sort.value)}
+              className={`px-3 py-1.5 text-sm font-semibold rounded-full transition-colors ${
+                sortType === sort.value
+                  ? 'bg-gray-900 text-white'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              {sort.label}
+            </button>
+          ))}
         </div>
 
-        {/* 검색 폼 */}
+        {/* 검색 폼 (BOARD_SEARCH_TYPES 상수 기반 동적 렌더링) */}
         <form onSubmit={handleSearchSubmit} className="flex gap-2">
           <select
             value={searchType}
             onChange={(e) => setSearchType(e.target.value)}
             className="border rounded-lg px-2.5 py-1.5 text-sm bg-white text-gray-700 border-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-400"
           >
-            <option value="title_content">제목+본문</option>
-            <option value="title">제목</option>
-            <option value="author">작성자</option>
+            {BOARD_SEARCH_TYPES.map((type) => (
+              <option key={type.value} value={type.value}>
+                {type.label}
+              </option>
+            ))}
           </select>
           <input
             type="text"
@@ -160,12 +155,6 @@ export default function BoardListPage({ posts = mockPosts }) {
               {/* 왼쪽: 게시글 정보 */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1.5">
-                  {/* 분류 칩 (후기 / 팁 / 질문) */}
-                  {post.category && (
-                    <span className="bg-gray-100 text-gray-600 text-xs px-2 py-0.5 rounded font-medium">
-                      {post.category}
-                    </span>
-                  )}
                   {/* 게시글 제목 */}
                   <h2 className="text-base font-semibold text-gray-900 truncate">
                     {post.title}
@@ -190,7 +179,7 @@ export default function BoardListPage({ posts = mockPosts }) {
               {post.images && post.images.length > 0 && (
                 <div className="w-16 h-16 sm:w-20 sm:h-20 shrink-0 bg-gray-100 rounded-lg overflow-hidden border border-gray-200">
                   <img
-                    src={post.images[0]}
+                    src={post.images[0].image_url || post.images[0]}
                     alt="게시글 대표 이미지"
                     className="w-full h-full object-cover"
                   />
