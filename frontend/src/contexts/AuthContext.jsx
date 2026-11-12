@@ -24,11 +24,17 @@ export const AuthProvider = ({ children }) => {
   // 로그인: 아이디 + 비밀번호, 성공하면 true (이메일은 회원가입 인증 · 비밀번호 찾기에만 씀)
   const login = async (login_id, password) => {
     setError("");
+    if (!login_id.trim() || !password) {
+      setError("아이디와 비밀번호를 입력하세요.");
+      return false;
+    }
     // TODO 백엔드 시작 시 추가
     // const response = await api.post("/auth/login", { login_id, password });
     // 성공하면 setUser(response.data), setIsAuthenticated(true), verifyJWT()
-    console.log("login", login_id, password);
-    return false;
+    // DB 연결 전 UI 확인용 임시 로그인. 실제 계정 인증은 하지 않음
+    setUser(mockUser);
+    setIsAuthenticated(true);
+    return true;
   };
 
   // 회원가입: 입력값을 먼저 확인하고, 성공하면 true
@@ -57,7 +63,8 @@ export const AuthProvider = ({ children }) => {
     setError("");
     // TODO 백엔드 시작 시 추가
     // const response = await api.post("/auth/signup", { login_id, email, nickname, password });
-    return false;
+    // DB 연결 전 입력 검사 통과 시 화면 이동만 허용. 실제 가입은 되지 않음
+    return true;
   };
 
   // 로그아웃: 로그인 정보를 지우고 홈으로
