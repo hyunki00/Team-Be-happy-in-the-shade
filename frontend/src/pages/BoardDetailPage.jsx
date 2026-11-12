@@ -1,5 +1,5 @@
 // 담당: 임유빈
-// 커뮤니티 게시물 상세페이지 [아직 수정중]
+// 커뮤니티 게시물 상세페이지 [아직 수정중] -
 
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
