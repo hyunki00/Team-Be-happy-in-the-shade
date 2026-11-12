@@ -86,8 +86,8 @@ export default function BoardDetailPage({ posts = mockPosts, onDeletePost }) {
     const commentObj = {
       pc_id: Date.now(),
       post_id: post.post_id,
-      user_id: user?.user_id || 1,
-      nickname: user?.nickname || '요리왕유빈',
+      user_id: user?.user_id,   // ||1 <<삭제 ||1로 지정 안함
+      nickname: user?.nickname || '익명', //BoardFormPage에 맞춰서 익명으로
       pc_content: newComment.trim(),
       pc_image_url: null,
       created_at: '방금 전',
@@ -258,6 +258,10 @@ export default function BoardDetailPage({ posts = mockPosts, onDeletePost }) {
                 onChange={(e) => setNewComment(e.target.value)}
                 className="flex-1 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-400 disabled:bg-gray-100"
               />
+              {/* 실시간 댓글 글자수 카운터 / 제한 수  추가*/}
+              <span className="text-xs text-gray-400">  
+                {newComment.length} / {COMMENT_MAX}자
+              </span>
               <button
                 type="submit"
                 disabled={!isAuthenticated || !newComment.trim()}
