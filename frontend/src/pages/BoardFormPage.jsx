@@ -30,14 +30,20 @@ export default function BoardFormPage({ posts = mockPosts, onSavePost }) {
   useEffect(() => {
     if (isEditMode) {
       const targetPost = posts.find((p) => String(p.post_id) === String(id));
-      if (targetPost) {
-        setTitle(targetPost.title || '');
-        setContent(targetPost.content || '');
-        setImages(targetPost.images || []);
-        setLinkedRecipe(targetPost.linked_recipe || null);
+      
+      // 수정하려는 글이 존재하지 않은 경우 추가(없는 게시글수정 주소로 들어갈 경우)
+      if (!targetPost) {
+        alert('존재하지 않거나 이미 삭제된 게시글입니다.');
+        navigate('/board', { replace: true }); // 목록으로 강제 이동
+        return;
       }
+
+      setTitle(targetPost.title || '');
+      setContent(targetPost.content || '');
+      setImages(targetPost.images || []);
+      setLinkedRecipe(targetPost.linked_recipe || null);
     }
-  }, [id, isEditMode, posts]);
+  }, [id, isEditMode, posts, navigate]);
 
   // 필수 조건 충족 여부 (제목, 본문 공백 불가)
   const isValid = title.trim() !== '' && content.trim() !== '';
