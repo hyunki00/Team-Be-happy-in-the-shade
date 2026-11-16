@@ -18,7 +18,7 @@ function RecipeCard({recipe, showMatch=false}) {
         <p>조리 시간 : {recipe.cooking_time}분</p>
         <p>난이도 : {recipe.level}</p>
         <p>작성자 : {recipe.nickname}</p>
-        {showMatch && <p>재료 일치율 : {recipe.match_rate*100}%</p>}
+        {showMatch && <p>재료 일치율 : {Math.round(recipe.match_rate * 100)}%</p>}
         {showMatch && (
           <p>
             {recipe.missing_ingredients.length === 0

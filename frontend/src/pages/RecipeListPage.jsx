@@ -1,20 +1,9 @@
 // 담당: 권우정 
-import {mockRecipes} from "../mockData";
+import { mockRecipes, mockIngredients, mockIngredientCategories } from "../mockData";
 import RecipeCard from "../components/RecipeCard";
 import { useState } from "react";
 
 function RecipeListPage() {
-  // //검색어 저장 변수 생성(keyword : 현재 검색창에 입력된 글자/setKeyword : 검색어 변경 함수)
-  // const [keyword, setKeyword] = useState("");
-  // //난이도 필터링 변수 생성
-  // const [level, setLevel] = useState("전체");
-  // //조리 시간 필터링 변수 생성
-  // const [cookingTime, setCookingTime] = useState("전체");
-  // //요리 종류 필터링 변수 생성
-  // const [category, setCategory] = useState("전체");
-  // // 정렬 기준 저장 (기본값: 가나다순)
-  // const [sortType, setSortType] = useState("name");  
-
   // 검색 및 필터 조건을 하나의 객체로 관리
   const [filters, setFilters] = useState({
     keyword: "", //검색어
@@ -24,6 +13,18 @@ function RecipeListPage() {
     cooking_time: null, //조리 시간
     sort: "name", //정렬
   });  
+
+  // 사용자가 식재료 선택창에서 고르고 있는 재료 임시로 보관
+  const [tempIngredients, setTempIngredients] = useState([]);
+
+  // 식재료 선택 영역 열기/닫기
+  const [isIngredientOpen, setIsIngredientOpen] = useState(false);
+
+  // 식재료 검색창에 입력한 글자
+  const [ingredientKeyword, setIngredientKeyword] = useState("");
+
+  // 식재료 대분류 선택 상태
+  const [ingredientCategory, setIngredientCategory] = useState(null);
 
   //filter() : 배열에서 조건에 맞는 데이터만 골라서 새로운 배열을 만드는 함수
   const filteredRecipes = mockRecipes.filter((recipe) => {
@@ -44,18 +45,111 @@ function RecipeListPage() {
       filters.r_category_id === null ||
       recipe.r_category_id === filters.r_category_id; 
 
+    // 레시피에 필요한 전체 재료
+    const recipeIngredients = recipe.ingredient_ids ?? [];
+
+    // 선택한 재료 중 레시피에 포함된 재료 개수
+    const matchedCount = recipeIngredients.filter((ingId) =>
+      filters.ingredients.includes(ingId)
+    ).length;
+
+    // 재료 일치율 계산
+    const matchRate =
+      recipeIngredients.length > 0
+        ? matchedCount / recipeIngredients.length
+        : 0;
+
+    // 재료를 선택하지 않았으면 전체 표시
+    // 선택했다면 일치율 70% 이상만 표시
+    const matchIngredients =
+      filters.ingredients.length === 0 ||
+      (recipeIngredients.length > 0 && matchRate >= 0.7);
+
     //검색, 난이도, 조리시간, 요리 종류 선택 모두 만족해야 출력
-    return matchKeyword && matchLevel && matchTime && matchCategory;
+    return matchKeyword && matchLevel && matchTime && matchCategory && matchIngredients;
   }); 
 
+  const recipesWithMatch = filteredRecipes.map((recipe) => {
+    // 재료를 선택하지 않았다면 기존 데이터 유지
+    if (filters.ingredients.length === 0) {
+      return recipe;
+    }
+
+    const recipeIngredients = recipe.ingredient_ids ?? [];
+
+    const matchedCount = recipeIngredients.filter((ingId) =>
+      filters.ingredients.includes(ingId)
+    ).length;
+
+    const matchRate =
+      recipeIngredients.length > 0
+        ? matchedCount / recipeIngredients.length
+        : 0;
+
+    // 선택하지 않은 재료 ID 찾기
+    const missingIds = recipeIngredients.filter(
+      (ingId) => !filters.ingredients.includes(ingId)
+    );
+
+    // ID를 재료 이름으로 변환
+    const missingIngredients = mockIngredients.filter((ingredient) =>
+      missingIds.includes(ingredient.ing_id)
+    );
+
+    return {
+      ...recipe,
+      match_rate: matchRate,
+      missing_ingredients: missingIngredients,
+    };
+  });  
+
+  // 재료가 하나 이상인지 확인하고, 재료가 선택되어있으면 정렬 기준을 일치율로 설정
+  const currentSort =
+  filters.ingredients.length > 0 ? "match_rate" : filters.sort;
+
   // 정렬 기준에 따라 가나다순 또는 일치율순 정렬
-  const sortedRecipes = [...filteredRecipes].sort((a, b) => {
+  const sortedRecipes = [...recipesWithMatch].sort((a, b) => {
     //일치율 높은 레시피부터 정렬(내림차순)
     if (filters.sort === "match_rate") {
       return b.match_rate - a.match_rate;
     }
     return a.recipe_title.localeCompare(b.recipe_title, "ko");
   });
+
+  // 식재료 선택 및 선택 해제
+  const handleIngredientToggle = (ingId) => {
+    setTempIngredients((prev) =>
+      prev.includes(ingId)
+        ? prev.filter((id) => id !== ingId)
+        : [...prev, ingId]
+    );
+  };
+
+  // 선택한 재료를 실제 검색에 반영
+  const handleIngredientConfirm = () => {
+    setFilters((prev) => ({
+      ...prev,
+      ingredients: tempIngredients,
+    }));
+
+    setIsIngredientOpen(false);
+  };
+
+  // 재료 선택창 닫고 선택 취소
+  const handleIngredientCancel = () => {
+    setTempIngredients(filters.ingredients);
+    setIsIngredientOpen(false);
+  };
+
+  // 임시 선택과 확정된 검색 재료를 모두 비우고 선택창을 닫음
+  const handleIngredientClear = () => {
+    setTempIngredients([]);
+    setFilters((prev) => ({
+      ...prev,
+      ingredients: [],
+    }));
+    setIsIngredientOpen(false);
+  };
 
   // 검색어, 필터, 정렬 기준 초기화
   const handleReset = () => {
@@ -67,7 +161,16 @@ function RecipeListPage() {
       cooking_time: null,
       sort: "name",
     });
+    setIngredientKeyword("");
+    setIngredientCategory(null);    
   };
+
+  // 재료 이름과 대분류 조건에 맞는 식재료 목록
+  const filteredIngredients = mockIngredients.filter((ingredient) =>
+    ingredient.ing_name.includes(ingredientKeyword.trim()) &&
+    (ingredientCategory === null ||
+      ingredient.ing_category_id === ingredientCategory)
+  );
 
   return (
     <div>
@@ -84,6 +187,102 @@ function RecipeListPage() {
         }
       /> 
       <p>현재 검색어 : {filters.keyword}</p> <br />
+
+      <h3>식재료 선택</h3>
+
+      <button
+        onClick={() => {
+          if (isIngredientOpen) {
+            handleIngredientCancel();
+          } else {
+            setTempIngredients([...filters.ingredients]);
+            setIsIngredientOpen(true);
+          }
+        }}
+      >
+        {isIngredientOpen ? "닫기" : "+ 식재료 선택"}
+      </button> <br />
+
+      {/* 실제 검색에 적용된 재료까지 삭제 */}
+      <button
+        onClick={handleIngredientClear}
+        disabled={filters.ingredients.length === 0}
+      >
+        검색 재료 초기화
+      </button> <br />
+
+      {isIngredientOpen && (
+        <div>
+          <input
+            type="text"
+            placeholder="식재료 이름 검색"
+            value={ingredientKeyword}
+            onChange={(e) => setIngredientKeyword(e.target.value)}
+          /> <br />
+          <select
+            value={ingredientCategory ?? ""}
+            onChange={(e) =>
+              setIngredientCategory(
+                e.target.value === "" ? null : Number(e.target.value)
+              )
+            }
+          >
+            <option value="">전체 재료</option>
+            {mockIngredientCategories.map((category) => (
+              <option
+                key={category.ing_category_id}
+                value={category.ing_category_id}
+              >
+                {category.category_name}
+              </option>
+            ))}
+          </select> <br />
+          {filteredIngredients.map((ingredient) => (
+            <span key={ingredient.ing_id}>
+              <button onClick={() => handleIngredientToggle(ingredient.ing_id)}>
+                {ingredient.ing_name}
+                {tempIngredients.includes(ingredient.ing_id) ? "✓" : ""}
+              </button>{" "}
+            </span>
+          ))}
+          {filteredIngredients.length === 0 && (
+            <p>검색 결과가 없습니다.</p>
+          )}
+        </div>
+      )}
+
+      <p>선택한 재료 수 : {tempIngredients.length}개</p> <br />  
+
+      <h4>선택한 재료</h4>
+      {/* 선택한 재료 0개 -> 안내 문구 표시 / 1개 이상 -> 안내 문구 숨김, 선택한 재료 버튼 표시 */}
+      {tempIngredients.length === 0 && (
+        <p>선택한 재료가 없습니다.</p>
+      )}
+
+      {mockIngredients
+        .filter((ingredient) => tempIngredients.includes(ingredient.ing_id))
+        .map((ingredient) => (
+          <span key={ingredient.ing_id}>
+            <button onClick={() => handleIngredientToggle(ingredient.ing_id)}>
+              {ingredient.ing_name} ✕
+            </button>{" "}
+          </span>
+        ))} <br />
+
+      {/* 선택창 안에서 임시로 고른 재료만 삭제 */}
+      <button
+        onClick={() => setTempIngredients([])}
+        disabled={tempIngredients.length === 0}
+      >
+        모두 지우기
+      </button> <br />
+
+      <button
+        onClick={handleIngredientConfirm}
+        disabled={tempIngredients.length === 0}
+      >
+        이 재료로 레시피 찾기 ({tempIngredients.length})
+      </button> <br />
 
       {/* filters.level이 null 또는 undefined이면 빈 문자열 "" 사용 */}
       <select
