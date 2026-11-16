@@ -10,7 +10,7 @@ import { mockUser } from "../mockData";
 
 // 개발용 가짜 로그인: true로 바꾸면 로그인한 상태(mockUser)로 시작한다.
 // 마이페이지 · 내 글 수정처럼 로그인 화면을 만들 때만 켜고, 커밋할 때는 false로 둔다.
-const DEV_LOGIN = false;
+const DEV_LOGIN = true;
 
 // Context를 먼저 정의
 const AuthContext = createContext(null);
