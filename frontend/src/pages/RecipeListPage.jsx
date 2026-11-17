@@ -1,7 +1,8 @@
 // 담당: 권우정 
-import { mockRecipes, mockIngredients, mockIngredientCategories } from "../mockData";
+import { mockRecipes, mockIngredients, mockIngredientCategories, mockFridge } from "../mockData";
 import RecipeCard from "../components/RecipeCard";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useAuth } from "../contexts/AuthContext"
 
 function RecipeListPage() {
   // 검색 및 필터 조건을 하나의 객체로 관리
@@ -26,7 +27,40 @@ function RecipeListPage() {
   // 식재료 대분류 선택 상태
   const [ingredientCategory, setIngredientCategory] = useState(null);
 
-  //filter() : 배열에서 조건에 맞는 데이터만 골라서 새로운 배열을 만드는 함수
+  // ON/OFF 상태(false : 일반 레시피 검색, true : 모든 재료 일치 기능 ON)
+  const [isAllIngredientsOn, setIsAllIngredientsOn] = useState(false);
+
+  // 로그인 상태 확인
+  const { isAuthenticated } = useAuth();
+
+  // 로그아웃하면 모든 재료 일치 기능 OFF
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setIsAllIngredientsOn(false);
+    }
+  }, [isAuthenticated]);
+
+  // 냉장고 재료 ID 목록 만들기
+  const fridgeIngredientIds = mockFridge.map(
+    (ingredient) => ingredient.ing_id
+  );
+
+  // 냉장고 재료 일치율 계산
+  const calculateFridgeMatchRate = (recipe) => {
+    const recipeIngredients = recipe.ingredient_ids ?? [];
+
+    if (recipeIngredients.length === 0) {
+      return 0;
+    }
+
+    const matchedCount = recipeIngredients.filter((ingId) =>
+      fridgeIngredientIds.includes(ingId)
+    ).length;
+
+    return matchedCount / recipeIngredients.length;
+  };
+
+  // filter() : 배열에서 조건에 맞는 데이터만 골라서 새로운 배열을 만드는 함수
   const filteredRecipes = mockRecipes.filter((recipe) => {
     //레시피 제목에 검색어 포함 -> true
     //앞 뒤 공백 제거해서 검색, 영어 대소문자 구분 없이 검색 가능
@@ -65,20 +99,39 @@ function RecipeListPage() {
       filters.ingredients.length === 0 ||
       (recipeIngredients.length > 0 && matchRate >= 0.7);
 
+    // 선택한 재료가 레시피에 모두 포함되어 있는지 확인
+      const matchSelectedIngredients =
+      filters.ingredients.every((ingId) =>
+        recipeIngredients.includes(ingId)
+    );
+
+    // ON일 때 선택 재료 포함 여부와 냉장고 일치율 70% 이상 확인
+    const matchFridge =
+      !isAllIngredientsOn ||
+      (
+        matchSelectedIngredients &&
+        calculateFridgeMatchRate(recipe) >= 0.7
+      );
+
     //검색, 난이도, 조리시간, 요리 종류 선택 모두 만족해야 출력
-    return matchKeyword && matchLevel && matchTime && matchCategory && matchIngredients;
+    return (matchKeyword && matchLevel && matchTime && matchCategory && (isAllIngredientsOn ? matchFridge : matchIngredients));
   }); 
 
-  const recipesWithMatch = filteredRecipes.map((recipe) => {
-    // 재료를 선택하지 않았다면 기존 데이터 유지
-    if (filters.ingredients.length === 0) {
-      return recipe;
-    }
+    const recipesWithMatch = filteredRecipes.map((recipe) => {
+      // ON이면 냉장고 재료, OFF면 선택한 재료를 기준으로 계산
+      const selectedIngredientIds = isAllIngredientsOn
+        ? fridgeIngredientIds
+        : filters.ingredients;
+
+      // OFF 상태에서 선택한 재료가 없으면 기존 데이터 유지
+      if (!isAllIngredientsOn && filters.ingredients.length === 0) {
+        return recipe;
+      }
 
     const recipeIngredients = recipe.ingredient_ids ?? [];
 
     const matchedCount = recipeIngredients.filter((ingId) =>
-      filters.ingredients.includes(ingId)
+      selectedIngredientIds.includes(ingId)
     ).length;
 
     const matchRate =
@@ -88,7 +141,7 @@ function RecipeListPage() {
 
     // 선택하지 않은 재료 ID 찾기
     const missingIds = recipeIngredients.filter(
-      (ingId) => !filters.ingredients.includes(ingId)
+      (ingId) => !selectedIngredientIds.includes(ingId)
     );
 
     // ID를 재료 이름으로 변환
@@ -203,6 +256,13 @@ function RecipeListPage() {
         {isIngredientOpen ? "닫기" : "+ 식재료 선택"}
       </button> <br />
 
+      <button
+        disabled={!isAuthenticated}
+        onClick={() => setIsAllIngredientsOn((prev) => !prev)}
+      >
+        모든 재료 일치: {isAllIngredientsOn ? "ON" : "OFF"}
+      </button> <br />
+
       {/* 실제 검색에 적용된 재료까지 삭제 */}
       <button
         onClick={handleIngredientClear}
@@ -248,41 +308,42 @@ function RecipeListPage() {
           {filteredIngredients.length === 0 && (
             <p>검색 결과가 없습니다.</p>
           )}
+
+
+          <p>선택한 재료 수 : {tempIngredients.length}개</p> <br />
+
+          <h4>선택한 재료</h4>
+          {/* 선택한 재료 0개 -> 안내 문구 표시 / 1개 이상 -> 안내 문구 숨김, 선택한 재료 버튼 표시 */}
+          {tempIngredients.length === 0 && (
+            <p>선택한 재료가 없습니다.</p>
+          )}
+
+          {mockIngredients
+            .filter((ingredient) => tempIngredients.includes(ingredient.ing_id))
+            .map((ingredient) => (
+              <span key={ingredient.ing_id}>
+                <button onClick={() => handleIngredientToggle(ingredient.ing_id)}>
+                  {ingredient.ing_name} ✕
+                </button>{" "}
+              </span>
+            ))} <br />
+
+          {/* 선택창 안에서 임시로 고른 재료만 삭제 */}
+          <button
+            onClick={() => setTempIngredients([])}
+            disabled={tempIngredients.length === 0}
+          >
+            모두 지우기
+          </button> <br />
+
+          <button
+            onClick={handleIngredientConfirm}
+            disabled={tempIngredients.length === 0}
+          >
+            이 재료로 레시피 찾기 ({tempIngredients.length})
+          </button> <br />
         </div>
       )}
-
-      <p>선택한 재료 수 : {tempIngredients.length}개</p> <br />  
-
-      <h4>선택한 재료</h4>
-      {/* 선택한 재료 0개 -> 안내 문구 표시 / 1개 이상 -> 안내 문구 숨김, 선택한 재료 버튼 표시 */}
-      {tempIngredients.length === 0 && (
-        <p>선택한 재료가 없습니다.</p>
-      )}
-
-      {mockIngredients
-        .filter((ingredient) => tempIngredients.includes(ingredient.ing_id))
-        .map((ingredient) => (
-          <span key={ingredient.ing_id}>
-            <button onClick={() => handleIngredientToggle(ingredient.ing_id)}>
-              {ingredient.ing_name} ✕
-            </button>{" "}
-          </span>
-        ))} <br />
-
-      {/* 선택창 안에서 임시로 고른 재료만 삭제 */}
-      <button
-        onClick={() => setTempIngredients([])}
-        disabled={tempIngredients.length === 0}
-      >
-        모두 지우기
-      </button> <br />
-
-      <button
-        onClick={handleIngredientConfirm}
-        disabled={tempIngredients.length === 0}
-      >
-        이 재료로 레시피 찾기 ({tempIngredients.length})
-      </button> <br />
 
       {/* filters.level이 null 또는 undefined이면 빈 문자열 "" 사용 */}
       <select
