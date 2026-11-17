@@ -13,6 +13,11 @@ recipes_t = table("recipes", column("recipe_id"), column("recipe_title"))
 
 class RecipeCommentCrud:
     @staticmethod
+    async def user_exists(db: AsyncSession, user_id: int) -> bool:
+        result = await db.execute(select(users_t.c.user_id).where(users_t.c.user_id == user_id))
+        return result.first() is not None
+
+    @staticmethod
     async def recipe_exists(db: AsyncSession, recipe_id: int) -> bool:
         result = await db.execute(select(recipes_t.c.recipe_id).where(recipes_t.c.recipe_id == recipe_id))
         return result.first() is not None
@@ -62,12 +67,14 @@ class RecipeCommentCrud:
         await db.flush()
         return comment
 
+    # 보낸 값만 바꾼다 (exclude_unset). 사진을 안 보내면 원래 사진이 그대로 남는다.
+    # 사진을 지우려면 rc_image_url: null 을 직접 보낸다.
     @staticmethod
     async def update_by_id(db: AsyncSession, rc_id: int, data: RecipeCommentCreate) -> RecipeComment | None:
         comment = await db.get(RecipeComment, rc_id)
         if comment:
-            comment.rc_content = data.rc_content
-            comment.rc_image_url = data.rc_image_url
+            for key, value in data.model_dump(exclude_unset=True).items():
+                setattr(comment, key, value)
             await db.flush()
         return comment
 

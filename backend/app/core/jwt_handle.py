@@ -26,15 +26,16 @@ def create_token(uid:int, expires_delta:timedelta,**kwargs) -> str:
     return encoded_jwt
 
 #create_token함수 호출해서 jwt생성 -> uid, exp 포함 -> kwargs없으면 payload는 uid, exp만 있음
+# type: 액세스 / 리프레시 토큰을 구분하는 표시 (리프레시 토큰으로 로그인하는 것 막기)
 def create_access_token(uid:int)->str:
-    return create_token(uid=uid, expires_delta=settings.access_token_expire_seconds)
+    return create_token(uid=uid, type="access", expires_delta=settings.access_token_expire_seconds)
 
 
 #리프레시 토큰 관리(재발급/ 로그아웃 시 무효화)
 #jti (jwt id): 서버에서 토큰 재사용 방지 관리 기능
 #uuid : 전세계에서 유일하게 식별할 수 있는 128비트 값 생성
 def create_refresh_token(uid:int) -> str:
-    return create_token(uid=uid, jti=str(uuid.uuid4()), expires_delta=settings.refresh_token_expire_seconds)
+    return create_token(uid=uid, type="refresh", jti=str(uuid.uuid4()), expires_delta=settings.refresh_token_expire_seconds)
 
 #토큰을 디코딩해서 payload를 딕셔너리로 반환
 #서명을 검증해서 토큰의 변조 여부를 확인
@@ -46,6 +47,9 @@ def decode_token(token:str)->dict:
     )
 
 #토큰을 디코딩한 후 uid값을 꺼낸다-> 사용자 id
-def verify_token(token:str)->int:
+#token_type: 기대하는 토큰 종류. 다르면 잘못된 토큰으로 처리 (기본은 액세스 토큰)
+def verify_token(token:str, token_type:str="access")->int:
     payload=decode_token(token)
+    if payload.get("type") != token_type:
+        raise jwt.InvalidTokenError("wrong token type")
     return payload.get("uid")

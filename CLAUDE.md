@@ -32,6 +32,7 @@ Vite 프로젝트 루트는 `frontend/`다 (`frontend/front/` 아님).
 frontend/src/
 ├── main.jsx
 ├── App.jsx                  라우터(createBrowserRouter) + 공통 레이아웃(RootLayout + Outlet)
+├── api.js                   백엔드 요청용 axios (모두 이것만 씀)
 ├── constants.js             공통 상수 (같이 쓰는 고정 값)
 ├── mockData.js              가짜 데이터 (백엔드 전까지 쓰는 견본, DB 이름 그대로)
 ├── components/              여러 페이지가 같이 쓰는 컴포넌트
@@ -45,7 +46,7 @@ frontend/src/
 ├── contexts/
 │   └── AuthContext.jsx      로그인 정보 (AuthProvider + useAuth)
 └── pages/
-    ├── HomePage.jsx  LoginPage.jsx  SignUpPage.jsx  MyPage.jsx  FridgePage.jsx
+    ├── HomePage.jsx  LoginPage.jsx  SignUpPage.jsx  ResetPasswordPage.jsx  MyPage.jsx  FridgePage.jsx
     ├── RecipeListPage.jsx  RecipeRecommendPage.jsx  RecipeDetailPage.jsx
     ├── RecipeCreatePage.jsx  RecipeEditPage.jsx
     ├── BoardListPage.jsx  BoardDetailPage.jsx  BoardFormPage.jsx
@@ -59,6 +60,7 @@ frontend/src/
 | 파일 (`src/` 아래) | 경로 | 담당 | 비고 |
 | --- | --- | --- | --- |
 | `main.jsx` · `App.jsx` | — | 조현기 | 아래 경로를 라우터에 모두 등록 |
+| `api.js` | — | 조현기 | axios 하나로 통일 (`withCredentials: true`) |
 | `contexts/AuthContext.jsx` | — | 조현기 | mini의 `useAuth.jsx`와 같은 내용 |
 | `components/NavBar.jsx` | — | 조현기 | 메뉴: 내 냉장고 · 레시피 검색 · 레시피 쓰기 · 커뮤니티 · 마이페이지 |
 | `components/ProtectedRoute.jsx` | — | 조현기 | 로그인 필요 경로를 감쌈 |
@@ -66,11 +68,12 @@ frontend/src/
 | `pages/NotFoundPage.jsx` | `*` | 조현기 |  |
 | `pages/LoginPage.jsx` | `/login` | 오효정 |  |
 | `pages/SignUpPage.jsx` | `/signup` | 오효정 | 이메일 인증 |
+| `pages/ResetPasswordPage.jsx` | `/password-reset` | 오효정 | 비밀번호 재설정 |
 | `pages/MyPage.jsx` | `/mypage` | 오효정 | 로그인 필요 |
 | `pages/RecipeCreatePage.jsx` | `/recipes/new` | 오효정 | 로그인 필요 |
 | `pages/RecipeEditPage.jsx` | `/recipes/:id/edit` | 오효정 | 로그인 · 본인만 |
 | `components/CommentSection.jsx` | — | 오효정 | `RecipeDetailPage`에서 사용 |
-| `pages/HomePage.jsx` | `/` | 정호진 |  |
+| `pages/HomePage.jsx` | `/` | 조현기 |  |
 | `pages/FridgePage.jsx` | `/fridge` | 정호진 | 로그인 필요. 조리도구 탭도 이 화면 안 |
 | `components/IngredientForm.jsx` | — | 정호진 | 재료 등록 · 수정 |
 | `components/IngredientCard.jsx` | — | 정호진 | `FridgePage`, `HomePage`에서 사용 |

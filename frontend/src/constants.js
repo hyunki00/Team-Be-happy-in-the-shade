@@ -33,7 +33,7 @@ export const RECIPE_SORT = [
 ];
 
 export const COOKING_TIME_DEFAULT = 10; // 레시피 쓰기 기본 조리시간(분) (가안)
-export const SERVINGS_DEFAULT = 1; // 인분 기본값 (가안, DB에 인분 컬럼이 아직 없음)
+export const SERVINGS_DEFAULT = 1; // 인분 기본값 (DB recipes.servings 기본값 1)
 export const SERVINGS_MAX = 99; // (가안)
 
 export const RECIPE_TITLE_MAX = 50; // 레시피 제목 글자 수 (가안, DB는 100자)
