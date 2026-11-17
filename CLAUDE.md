@@ -32,6 +32,7 @@ Vite 프로젝트 루트는 `frontend/`다 (`frontend/front/` 아님).
 frontend/src/
 ├── main.jsx
 ├── App.jsx                  라우터(createBrowserRouter) + 공통 레이아웃(RootLayout + Outlet)
+├── api.js                   백엔드 요청용 axios (모두 이것만 씀)
 ├── constants.js             공통 상수 (같이 쓰는 고정 값)
 ├── mockData.js              가짜 데이터 (백엔드 전까지 쓰는 견본, DB 이름 그대로)
 ├── components/              여러 페이지가 같이 쓰는 컴포넌트
@@ -45,7 +46,7 @@ frontend/src/
 ├── contexts/
 │   └── AuthContext.jsx      로그인 정보 (AuthProvider + useAuth)
 └── pages/
-    ├── HomePage.jsx  LoginPage.jsx  SignUpPage.jsx  MyPage.jsx  FridgePage.jsx
+    ├── HomePage.jsx  LoginPage.jsx  SignUpPage.jsx  ResetPasswordPage.jsx  MyPage.jsx  FridgePage.jsx
     ├── RecipeListPage.jsx  RecipeRecommendPage.jsx  RecipeDetailPage.jsx
     ├── RecipeCreatePage.jsx  RecipeEditPage.jsx
     ├── BoardListPage.jsx  BoardDetailPage.jsx  BoardFormPage.jsx
@@ -59,6 +60,7 @@ frontend/src/
 | 파일 (`src/` 아래) | 경로 | 담당 | 비고 |
 | --- | --- | --- | --- |
 | `main.jsx` · `App.jsx` | — | 조현기 | 아래 경로를 라우터에 모두 등록 |
+| `api.js` | — | 조현기 | axios 하나로 통일 (`withCredentials: true`) |
 | `contexts/AuthContext.jsx` | — | 조현기 | mini의 `useAuth.jsx`와 같은 내용 |
 | `components/NavBar.jsx` | — | 조현기 | 메뉴: 내 냉장고 · 레시피 검색 · 레시피 쓰기 · 커뮤니티 · 마이페이지 |
 | `components/ProtectedRoute.jsx` | — | 조현기 | 로그인 필요 경로를 감쌈 |
@@ -66,11 +68,12 @@ frontend/src/
 | `pages/NotFoundPage.jsx` | `*` | 조현기 |  |
 | `pages/LoginPage.jsx` | `/login` | 오효정 |  |
 | `pages/SignUpPage.jsx` | `/signup` | 오효정 | 이메일 인증 |
+| `pages/ResetPasswordPage.jsx` | `/password-reset` | 오효정 | 비밀번호 재설정 |
 | `pages/MyPage.jsx` | `/mypage` | 오효정 | 로그인 필요 |
 | `pages/RecipeCreatePage.jsx` | `/recipes/new` | 오효정 | 로그인 필요 |
 | `pages/RecipeEditPage.jsx` | `/recipes/:id/edit` | 오효정 | 로그인 · 본인만 |
 | `components/CommentSection.jsx` | — | 오효정 | `RecipeDetailPage`에서 사용 |
-| `pages/HomePage.jsx` | `/` | 정호진 |  |
+| `pages/HomePage.jsx` | `/` | 조현기 |  |
 | `pages/FridgePage.jsx` | `/fridge` | 정호진 | 로그인 필요. 조리도구 탭도 이 화면 안 |
 | `components/IngredientForm.jsx` | — | 정호진 | 재료 등록 · 수정 |
 | `components/IngredientCard.jsx` | — | 정호진 | `FridgePage`, `HomePage`에서 사용 |
@@ -88,7 +91,7 @@ frontend/src/
 
 - 여러 파일에서 쓰는 고정 값(요리 종류, 난이도, 글자 수 제한, 단위 등)은 `src/constants.js`에서 import 한다. 파일 안에 값을 직접 적지 않는다. 새 상수가 필요하면 만들기 전에 물어본다.
 - 백엔드가 생기기 전까지 화면 데이터는 `src/mockData.js`에서 import 해서 `useState(mockRecipes)`처럼 쓴다. 필드 이름을 바꾸거나 새 모양을 지어내지 않는다. 필요한 값이 없으면 물어본다.
-- 레시피는 `recipe_title` · `intro`, 게시글은 `title` · `content`. 냉장고 `amount`는 문자열.
+- 레시피는 `recipe_title` · `intro`, 게시글은 `title` · `content`. 냉장고 `amount`는 숫자(INT), 단위는 `unit`(g · L · 개)에 따로.
 - 로그인한 화면을 확인할 때는 `AuthContext.jsx`의 `DEV_LOGIN`을 `true`로 바꾼다. 커밋 전에는 `false`로 되돌린다.
 - `user`는 로그인 전 `null`이므로 `user?.nickname`처럼 쓴다.
 - 사진 업로드는 미리보기(`URL.createObjectURL`)까지만 만든다.
@@ -98,9 +101,9 @@ frontend/src/
 - `App.jsx`: `createBrowserRouter` + `RouterProvider`, 공통 레이아웃 `RootLayout` 안에 `NavBar` + `<Outlet />`.
 - `AuthContext.jsx`: `AuthProvider`와 `useAuth`를 내보낸다. 값은 `user`, `isAuthenticated`, `error`, `setError`, `login`, `signup`, `logout`.
 - 로그인은 **아이디(`login_id`, 영문 · 숫자 4~20자) + 비밀번호(8자 이상)**. 이메일은 회원가입 인증번호와 비밀번호 찾기에만 쓴다. `login(login_id, password)`.
-- 서버 요청은 axios 인스턴스 하나(`baseURL: import.meta.env.VITE_API_URL`, `withCredentials: true`)로만 한다. 페이지마다 axios를 새로 만들지 않는다.
+- 서버 요청은 `src/api.js`의 axios 인스턴스 하나(`baseURL: import.meta.env.VITE_API_URL`, `withCredentials: true`)로만 한다. `import api from "../api";` 페이지마다 axios를 새로 만들지 않는다.
 - 알림 · 확인창은 sweetalert2로 mini의 `showSuccessAlert`, `showErrorAlert`, `showConfirmDialog`, `handleAuthError` 방식을 쓴다.
-- 서버 요청용 파일과 알림 함수 파일은 아직 위치를 정하지 않았다 (백엔드 시작 때). 필요하면 만들기 전에 물어본다.
+- 알림 함수 파일은 아직 위치를 정하지 않았다. 필요하면 만들기 전에 물어본다.
 
 ## 이름 규칙
 
@@ -161,21 +164,25 @@ mini의 오타(`serivces`, `alertUtiles`, `LootLayout`)는 따라 하지 않고 
 | --- | --- | --- | --- |
 | 회원 | `User` | `UserCrud` · `UserService` | `/users` |
 | 내 냉장고 | `UserIngredient` | `FridgeCrud` · `FridgeService` | `/fridge` |
-| 식재료 | `Ingredient` · `IngredientCategory` · `IngredientSynonym` | `IngredientCrud` | `/ingredients` |
+| 식재료 | `Ingredient` · `IngredientCategory` · `IngredientSynonym` · `IngCateSynonym` | `IngredientCrud` | `/ingredients` |
 | 조리도구 | `StandardTool` · `MyTool` | `ToolCrud` · `ToolService` | `/tools` |
-| 레시피 | `Recipe` · `RecipeCategory` · `RecipeIngredient` · `RecipeStep` | `RecipeCrud` · `RecipeService` | `/recipes` |
+| 레시피 | `Recipe` · `RecipeCategory` · `CategorySynonym` · `RecipeIngredient` · `RecipeStep` | `RecipeCrud` · `RecipeService` | `/recipes` |
 | 레시피 반응 | `RecipeLike` · `Bookmark` · `RecipeComment` | `RecipeCrud` 안에 | `/recipes/{recipe_id}/comments` 등 |
 | 게시판 | `Post` · `PostImage` · `PostLike` · `PostComment` | `PostCrud` · `PostService` | `/posts` (화면 주소는 `/board`) |
 
 - 모델 파일은 복수형(`recipes.py`), crud · service · router 파일은 단수형(`recipe.py`).
 - scheme 클래스는 모델명 + `Create` · `Update` · `Read`. crud 메서드는 `get_by_id` · `create` · `update_by_id` · `delete_by_id`.
-- DB 이름은 11/6 최신 DB 설계서(테이블 생성 SQL) 기준. 헷갈리기 쉬운 것:
-  - `users`: `login_id`(로그인 아이디, DB에 추가 예정), `email`(인증용), `nickname` (username 아님), `created_at`
-  - `user_ingredients.amount`는 문자열(VARCHAR)
-  - `recipes`: 소개글은 `intro`(200자), `tool_id`(필요 조리도구) 필수, `level`은 초급 · 중급 · 고급
-  - `posts`: `title`, `content` / `post_images`: `image_id`, `image_url`, `image_order` / 게시글 좋아요 테이블은 `posts_likes`
-  - 좋아요 · 북마크 테이블은 `user_id` + 대상 id 복합 키 (별도 id 없음)
-  - 유의어: `ingredient_synonyms` · `tool_synonyms` · `category_synonyms` (`synonym_id`, `synonym_name`)
+- DB 이름은 11/13 DB(`1_테이블생성_happy_shade.sql`) 기준. 헷갈리기 쉬운 것:
+  - `users`: `login_id`(로그인 아이디, 영문 · 숫자 4~20자), `email`(인증용), `password`, `nickname` (username 아님), `profile_image`, `refresh_token`(로그인 때 저장 · 로그아웃 때 NULL), `created_at`
+  - `user_ingredients`: `amount`는 숫자(INT), `unit`(g · L · 개), `expiration_date`(소비기한). 보관 위치 컬럼 없음
+  - `recipes`: 소개글은 `intro`(200자), `servings`(인분, 기본 1), `tool_id`(필요 조리도구)는 비워 둘 수 있음(불 안 쓰는 레시피는 NULL), `level`은 초급 · 중급 · 고급
+  - `recipe_ingredients`: `amount_text`(재료 양을 글자로, 예: "1큰술"). 필수 재료 컬럼 없음
+  - `recipe_steps`: `step_no`, `step_content`, `step_image_url`
+  - 댓글: 레시피 `recipe_comments`(`rc_id`, `rc_content`, `rc_image_url`) · 게시글 `post_comments`(`pc_id`, `pc_content`, `pc_image_url`). 댓글 좋아요 테이블 없음
+  - `posts`: `title`, `content` / `post_images`: `p_image_id`, `p_image_url`, `p_image_order` / 게시글 좋아요 테이블은 `posts_likes`
+  - 좋아요 · 북마크 테이블(`recipe_likes`, `bookmarks`, `posts_likes`)은 `user_id` + 대상 id 복합 키 (별도 id 없음)
+  - 유의어: 식재료 `ingredient_synonyms`(`ing_sy_id`, `ing_sy_name`) · 식재료 대분류 `ing_cate_synonyms`(`ing_cate_sy_id`, `ing_cate_sy_name`) · 요리 종류 `category_synonyms`(`r_cate_sy_id`, `r_cate_sy_name`). 조리도구 유의어 테이블은 없음
+  - 조리도구: `standard_tools`(`tool_id`, `tool_name`) · 내 조리도구 `my_tools`(`user_tool_id`)
 - 일치율 계산은 `RecipeService`. 서버가 계산해서 주는 값: `match_rate`, `missing_ingredients`, `like_count`, `comment_count`, `is_liked`, `is_bookmarked`, `is_mine`.
 
 ## 아직 정하지 않은 것 (임의로 정하지 말고 물어볼 것)
@@ -183,7 +190,7 @@ mini의 오타(`serivces`, `alertUtiles`, `LootLayout`)는 따라 하지 않고 
 - `RecipeRecommendPage`를 따로 둘지 (v6에서는 추천이 내 냉장고 · 검색 화면 안에 있음)
 - `CommentSection`을 게시글 댓글에도 쓸지
 - 컴포넌트 문서에 없는 화면(비밀번호 찾기, 프로필 수정, 내 댓글, 재료 담기, 식재료 선택 모달)의 파일 이름
-- 서버 요청 · 알림 함수를 둘 파일 위치 (백엔드 시작 때)
-- 재료 대분류 이름 · 번호, 사진 업로드 방식
+- 알림 함수를 둘 파일 위치
+- 사진 업로드 방식 (재료 대분류 8개는 DB `ingredients_categories`로 정해짐)
 - `constants.js`에 (가안)으로 표시된 값
 - 내 냉장고 화면 안 (A-1 / A-2 / B)

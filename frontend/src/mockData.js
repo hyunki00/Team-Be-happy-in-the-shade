@@ -125,6 +125,7 @@ export const mockRecipes = [
     comment_count: 2,
     match_rate: 1,
     missing_ingredients: [],
+    ingredient_ids: [15, 2, 26],
   },
   {
     recipe_id: 2,

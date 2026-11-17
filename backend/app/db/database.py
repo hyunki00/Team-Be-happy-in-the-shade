@@ -1,9 +1,8 @@
 # 담당: 조현기 (공통) — mini와 같음
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import create_engine
 from app.core.settings import settings
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, declarative_base
 
 #비동기 db연결 생성하는 함수(비동기적으로 db와 연결한다)
 async_engine=create_async_engine(settings.db_url, echo=False)

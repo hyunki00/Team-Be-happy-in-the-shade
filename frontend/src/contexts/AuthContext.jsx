@@ -1,6 +1,6 @@
 // 담당: 조현기
 // 로그인 정보를 모든 페이지에서 같이 쓰기 위한 파일 
-// 서버 요청(api)과 알림창은 백엔드를 시작할 때 TODO 자리에 추가한다.
+// 서버 요청은 src/api.js의 api를 쓴다. 백엔드를 시작할 때 TODO 자리에 추가한다.
 // (아래 eslint 주석: 이 파일은 AuthProvider와 useAuth를 같이 내보내서 생기는 경고를 끈다. 실행에는 문제 없음)
 /* eslint-disable react-refresh/only-export-components */
 import { useState, createContext, useContext } from "react";
@@ -10,7 +10,7 @@ import { mockUser } from "../mockData";
 
 // 개발용 가짜 로그인: true로 바꾸면 로그인한 상태(mockUser)로 시작한다.
 // 마이페이지 · 내 글 수정처럼 로그인 화면을 만들 때만 켜고, 커밋할 때는 false로 둔다.
-const DEV_LOGIN = true;
+const DEV_LOGIN = false;
 
 // Context를 먼저 정의
 const AuthContext = createContext(null);

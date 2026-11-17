@@ -65,6 +65,9 @@ async def create_comment(
     user_id: int = Depends(get_user_id),
     db: AsyncSession = Depends(get_db),
 ):
+    # 토큰은 맞는데 사용자가 없으면 (탈퇴 · DB를 새로 만든 뒤 남은 쿠키) 다시 로그인하게 401
+    if not await RecipeCommentCrud.user_exists(db, user_id):
+        raise HTTPException(status_code=401, detail="다시 로그인해 주세요.")
     if not await RecipeCommentCrud.recipe_exists(db, recipe_id):
         raise HTTPException(status_code=404, detail="레시피를 찾을 수 없습니다.")
     comment = await RecipeCommentCrud.create(db, user_id, recipe_id, data)

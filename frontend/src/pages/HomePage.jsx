@@ -1,4 +1,4 @@
-// 담당: 정호진 (임시화면입니다~)
+// 담당: 조현기 (임시화면입니다~)
 function HomePage() {
   return <div>HomePage</div>;
 }
