@@ -4,4 +4,4 @@ from .recipe_comments import RecipeComment
 # from .users import User                                   (오효정)
 # from .fridges import UserIngredient, StandardTool, MyTool (정호진)
 # from .recipes import RecipeCategory, CategorySynonym, Recipe, RecipeIngredient, RecipeStep, RecipeLike, Bookmark (권우정)
-# from .posts import Post, PostImage, PostLike, PostComment (임유빈)
+from .posts import Post, PostImage, PostLike, PostComment #(임유빈)

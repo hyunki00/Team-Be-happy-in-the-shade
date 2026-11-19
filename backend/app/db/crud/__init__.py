@@ -4,4 +4,4 @@ from .recipe_comment import RecipeCommentCrud
 # from .user import UserCrud        (오효정)
 # from .fridge import FridgeCrud    (정호진)
 # from .recipe import RecipeCrud    (권우정)
-# from .post import PostCrud        (임유빈)
+from .post import PostCrud         #(임유빈)
