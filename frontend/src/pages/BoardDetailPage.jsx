@@ -198,7 +198,7 @@ export default function BoardDetailPage({ posts = mockPosts, onDeletePost }) {
             <h1 className="text-2xl font-bold text-gray-900 mb-3">{post.title}</h1>
             <div className="flex justify-between items-center text-sm text-gray-500">
               <span className="font-semibold text-gray-800">{post.nickname}</span>
-              <span>{post.created_at} · 조회 {post.view_count || 0}</span>
+              <span>{post.created_at}</span>
             </div>
           </div>
 

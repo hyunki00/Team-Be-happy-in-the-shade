@@ -164,8 +164,7 @@ export default function BoardListPage({ posts = mockPosts }) {
                 {/* 메타 정보: 작성자 | 작성일 | 조회수 | 좋아요 | 댓글 */}
                 <div className="flex items-center gap-3 text-xs text-gray-500">
                   <span className="font-medium text-gray-700">{post.nickname || '익명'}</span>
-                  <span>{post.created_at || '방금 전'}</span>
-                  <span>조회 {post.view_count || 0}</span>
+                  <span>{post.created_at || '방금 전'}</span>                  
                   <span className="flex items-center gap-0.5 text-red-500 font-medium">
                     ♡ {post.like_count || 0}
                   </span>
