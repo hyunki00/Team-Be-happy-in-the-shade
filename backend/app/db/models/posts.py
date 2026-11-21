@@ -15,7 +15,7 @@ from typing import Optional
 from sqlalchemy import String, Text, DateTime, func
 from sqlalchemy.orm import Mapped, mapped_column
 from app.db.database import Base
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, foreign
 
 
 # 게시글 테이블
@@ -29,7 +29,11 @@ class Post(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
 
     # relationship 추가해 주어야 Pydantic스키마가 images를 빼갈 수 있습니다!
-    images: Mapped[list["PostImage"]] = relationship(back_populates="post", cascade="all, delete-orphan")
+    # 모델에 ForeignKey를 선언하지 않아 연결 조건을 직접 지정합니다.
+    images: Mapped[list["PostImage"]] = relationship(
+        back_populates="post", cascade="all, delete-orphan",
+        primaryjoin=lambda: Post.post_id == foreign(PostImage.post_id),
+    )
 
 
 
@@ -43,7 +47,10 @@ class PostImage(Base):
     p_image_order: Mapped[int] = mapped_column(nullable=False)
 
     # Post처럼 relationship추가 - 양방향 관계 설정(사진에서 부모 게시글 쪽으로 찾아갈 수 있게)
-    post: Mapped["Post"] = relationship(back_populates="images")
+    post: Mapped["Post"] = relationship(
+        back_populates="images",
+        primaryjoin=lambda: Post.post_id == foreign(PostImage.post_id),
+    )
 
 
 
