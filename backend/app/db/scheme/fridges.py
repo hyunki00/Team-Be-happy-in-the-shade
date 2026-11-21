@@ -1,10 +1,59 @@
-# 담당: 정호진
-# 할 일: BaseModel 클래스
-#   UserIngredientCreate / UserIngredientUpdate   ing_id, amount, unit, expiration_date
-#   UserIngredientRead   mockFridge 모양 (재료 이름 ing_name · 대분류 ing_category_id를 붙여서)
-#   ToolRead / MyToolRead   mockStandardTools · mockMyTools 모양
-#
-# - 모양은 app/db/scheme/ingredients.py · recipe_comments.py(조현기) 참고
-# - 필드 이름은 프론트 mockData.js와 같게 (화면이 그대로 받을 수 있게)
-# - DB 모델 객체를 그대로 돌려줄 클래스에는 model_config = ConfigDict(from_attributes=True)
-# - 글자 수 제한은 Field(max_length=…)로, 숫자는 프론트 constants.js와 맞추기
+# 담당: 정호진 — 프론트 mockFridge · mockMyTools와 같은 필드 이름
+from datetime import date
+from typing import Literal
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+
+class UserIngredientCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    ing_id: int = Field(gt=0)
+    amount: int = Field(strict=True, ge=1, le=999)
+    unit: Literal["g", "L", "개"]
+    expiration_date: date | None = None
+
+
+class UserIngredientUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    ing_id: int | None = Field(None, gt=0)
+    amount: int | None = Field(None, strict=True, ge=1, le=999)
+    unit: Literal["g", "L", "개"] | None = None
+    expiration_date: date | None = None
+
+    @model_validator(mode="after")
+    def check_fields(self):
+        # 생략한 값은 유지하고, 날짜만 null로 지울 수 있습니다.
+        if not self.model_fields_set:
+            raise ValueError("수정할 값을 보내 주세요.")
+        for name in ("ing_id", "amount", "unit"):
+            if name in self.model_fields_set and getattr(self, name) is None:
+                raise ValueError(f"{name}에는 null을 넣을 수 없습니다.")
+        return self
+
+
+class UserIngredientRead(BaseModel):
+    user_ing_id: int
+    ing_id: int
+    ing_name: str
+    ing_category_id: int
+    amount: int | None
+    unit: str | None
+    expiration_date: date | None
+
+
+class ToolRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    tool_id: int
+    tool_name: str
+
+
+class MyToolCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    tool_id: int = Field(gt=0)
+
+
+class MyToolRead(ToolRead):
+    user_tool_id: int

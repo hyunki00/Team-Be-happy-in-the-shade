@@ -1,10 +1,31 @@
-# 담당: 정호진
-# 할 일:
-#   UserIngredient → user_ingredients   user_ing_id, user_id, ing_id, expiration_date, amount(INT), unit(추가 요청분)
-#   StandardTool   → standard_tools     tool_id, tool_name
-#   MyTool         → my_tools           user_tool_id, user_id, tool_id
-#
-# - 모양은 app/db/models/ingredients.py · recipe_comments.py(조현기) 참고: class 이름(Base) + __tablename__ + mapped_column
-# - 테이블 · 컬럼 이름과 타입은 테이블 생성 SQL(11/13)과 글자 하나까지 같게
-# - ForeignKey는 DB에 이미 걸려 있으니 안 적어도 됨 (적으면 상대 모델이 없을 때 오류)
-# - 다 만들면 app/db/models/__init__.py에 import 한 줄 추가
+# 담당: 정호진 — 냉장고 재료와 조리도구
+from datetime import date
+from sqlalchemy import Date, String
+from sqlalchemy.orm import Mapped, mapped_column
+from app.db.database import Base
+
+
+class UserIngredient(Base):
+    __tablename__ = "user_ingredients"
+
+    user_ing_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(nullable=False)
+    ing_id: Mapped[int] = mapped_column(nullable=False)
+    expiration_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    amount: Mapped[int | None] = mapped_column(nullable=True)
+    unit: Mapped[str | None] = mapped_column(String(10), nullable=True)
+
+
+class StandardTool(Base):
+    __tablename__ = "standard_tools"
+
+    tool_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    tool_name: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
+
+
+class MyTool(Base):
+    __tablename__ = "my_tools"
+
+    user_tool_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(nullable=False)
+    tool_id: Mapped[int] = mapped_column(nullable=False)

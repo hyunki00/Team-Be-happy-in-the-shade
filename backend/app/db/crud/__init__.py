@@ -2,6 +2,6 @@
 from .ingredient import IngredientCrud
 from .recipe_comment import RecipeCommentCrud
 from .user import UserCrud       
-# from .fridge import FridgeCrud    (정호진)
+from .fridge import FridgeCrud
 # from .recipe import RecipeCrud    (권우정)
 from .post import PostCrud         #(임유빈)
