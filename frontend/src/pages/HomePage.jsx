@@ -2,9 +2,10 @@
 // 메인 화면 (와이어프레임 v6 5~6장)
 // 로그인: 배너(내 냉장고 열기) → 내 냉장고 추천 → 인기 레시피 + 커뮤니티 새 글
 // 비로그인: 배너(로그인하고 시작하기) → 인기 레시피 → 새로 올라온 레시피 + 커뮤니티 새 글
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import api from "../api";
 import RecipeCard from "../components/RecipeCard";
 import { mockRecipes, mockPosts } from "../mockData";
 
@@ -31,16 +32,31 @@ function SectionTitle({ title, moreTo }) {
 function HomePage() {
   const { isAuthenticated } = useAuth();
 
-  // 백엔드가 생기면 서버 요청 결과로 바꾼다
-  // 추천: 내 냉장고 추천 API (일치율 70% 이상은 서버가 골라서 줌)
-  // 인기 · 새 레시피: 레시피 목록 API / 커뮤니티 새 글: 게시글 목록 API
+  // 내 냉장고 추천: 서버 GET /fridge/recommendations (일치율 70% 이상, 높은 순으로 줌)
+  const [recommendRecipes, setRecommendRecipes] = useState([]);
+  const [recommendError, setRecommendError] = useState("");
+
+  // 아직 서버에 없는 것은 가짜 데이터로 보여 준다
+  // 인기 · 새 레시피: /recipes에 인기순 · 최신순 정렬이 생기면 서버로 바꾼다
+  // 커뮤니티 새 글: 게시글 API(/posts)가 생기면 서버로 바꾼다
   const [recipes] = useState(mockRecipes);
   const [posts] = useState(mockPosts);
 
-  // 내 냉장고 추천: 일치율 높은 순
-  const recommendRecipes = [...recipes]
-    .sort((a, b) => b.match_rate - a.match_rate)
-    .slice(0, RECOMMEND_COUNT);
+  // 로그인했을 때만 추천을 받아 온다
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const controller = new AbortController();
+    api
+      .get("/fridge/recommendations", { signal: controller.signal })
+      .then(({ data }) => {
+        setRecommendRecipes(data.slice(0, RECOMMEND_COUNT));
+        setRecommendError("");
+      })
+      .catch((err) => {
+        if (err.code !== "ERR_CANCELED") setRecommendError("추천 레시피를 불러오지 못했습니다.");
+      });
+    return () => controller.abort();
+  }, [isAuthenticated]);
 
   // 인기 레시피: 좋아요 많은 순
   const popularRecipes = [...recipes]
@@ -58,7 +74,7 @@ function HomePage() {
     .slice(0, NEW_POST_COUNT);
 
   return (
-    <main className="p-6 flex flex-col gap-10">
+    <div className="p-6 flex flex-col gap-10">
       {/* ③ 첫 화면 배너: 로그인 → 내 냉장고 / 비로그인 → 로그인 */}
       <section className="flex items-center justify-between gap-6 p-8 rounded bg-gray-100">
         <div>
@@ -85,7 +101,9 @@ function HomePage() {
       {isAuthenticated && (
         <section>
           <SectionTitle title="내 냉장고 재료로 만들 수 있는 요리" moreTo="/fridge" />
-          {recommendRecipes.length === 0 ? (
+          {recommendError ? (
+            <p className="text-gray-500">{recommendError}</p>
+          ) : recommendRecipes.length === 0 ? (
             <p className="text-gray-500">냉장고에 재료를 담으면 만들 수 있는 요리를 보여드려요.</p>
           ) : (
             <div className="flex flex-wrap gap-4">
@@ -147,7 +165,7 @@ function HomePage() {
           </ul>
         </section>
       </div>
-    </main>
+    </div>
   );
 }
 

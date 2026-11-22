@@ -61,10 +61,18 @@ export const AuthProvider = ({ children }) => {
       return false;
     }
     setError("");
-    // TODO 백엔드 시작 시 추가
-    // const response = await api.post("/auth/signup", { login_id, email, nickname, password });
-    // DB 연결 전 입력 검사 통과 시 화면 이동만 허용. 실제 가입은 되지 않음
-    return true;
+    try {
+      // 회원가입만 하고 로그인은 하지 않는다 (가입 후 로그인 화면으로 이동)
+      await api.post("/auth/signup", { login_id, email, nickname, password });
+      return true;
+    } catch (err) {
+      const detail = err.response?.data?.detail;
+      // 400: "이미 사용 중인 아이디입니다." 같은 글자 / 422: 입력 형식 오류(목록)
+      if (typeof detail === "string") setError(detail);
+      else if (Array.isArray(detail)) setError("입력한 값을 다시 확인해 주세요.");
+      else setError("회원가입 서버에 연결할 수 없습니다. 다시 시도해 주세요.");
+      return false;
+    }
   };
 
   // 쿠키는 서버가 삭제합니다. 실패한 경우 로그인 상태를 유지합니다.
