@@ -10,3 +10,108 @@
 # - 로그인 필수: user_id: int = Depends(get_user_id) / 로그인 선택: Depends(get_optional)  (app/core/auth.py)
 # - DB 세션: db: AsyncSession = Depends(get_db)  (app/db/database.py)
 # - 만든 뒤 http://localhost:8044/docs 에서 바로 눌러 보며 확인
+
+from fastapi import APIRouter, Depends, Query
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.auth import get_user_id, get_optional
+from app.db.database import get_db
+from app.db.scheme.recipes import RecipeDetail, RecipeListItem, RecipeSearch
+from app.services.recipe import RecipeService
+
+
+router = APIRouter(prefix="/recipes", tags=["recipes"])
+
+
+# 1. 레시피 목록 / 검색
+@router.get("", response_model=list[RecipeListItem])
+async def get_recipes(
+    keyword: str | None = None,
+    r_category_id: int | None = None,
+    level: str | None = None,
+    cooking_time: int | None = Query(default=None, ge=1),
+    ingredient_ids: list[int] = Query(default=[]),
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    user_id: int | None = Depends(get_optional),
+    db: AsyncSession = Depends(get_db)
+):
+    search = RecipeSearch(
+        keyword=keyword,
+        r_category_id=r_category_id,
+        level=level,
+        cooking_time=cooking_time,
+        ingredient_ids=ingredient_ids
+    )
+
+    return await RecipeService.search(
+        db, search, user_id, limit, offset
+    )
+
+
+# 2. 레시피 상세
+@router.get("/{recipe_id}", response_model=RecipeDetail)
+async def get_recipe_detail(
+    recipe_id: int,
+    user_id: int | None = Depends(get_optional),
+    db: AsyncSession = Depends(get_db)
+):
+    return await RecipeService.get_detail(
+        db, recipe_id, user_id
+    )
+
+
+# 3. 좋아요 추가
+@router.post("/{recipe_id}/likes")
+async def add_recipe_like(
+    recipe_id: int,
+    user_id: int = Depends(get_user_id),
+    db: AsyncSession = Depends(get_db)
+):
+    liked = await RecipeService.toggle_like(
+        db, recipe_id, user_id, True
+    )
+
+    return {"is_liked": liked}
+
+
+# 4. 좋아요 취소
+@router.delete("/{recipe_id}/likes")
+async def delete_recipe_like(
+    recipe_id: int,
+    user_id: int = Depends(get_user_id),
+    db: AsyncSession = Depends(get_db)
+):
+    liked = await RecipeService.toggle_like(
+        db, recipe_id, user_id, False
+    )
+
+    return {"is_liked": liked}
+
+
+# 5. 북마크 추가
+@router.post("/{recipe_id}/bookmarks")
+async def add_recipe_bookmark(
+    recipe_id: int,
+    user_id: int = Depends(get_user_id),
+    db: AsyncSession = Depends(get_db)
+):
+    bookmarked = await RecipeService.toggle_bookmark(
+        db, recipe_id, user_id, True
+    )
+
+    return {"is_bookmarked": bookmarked}
+
+
+# 6. 북마크 취소
+@router.delete("/{recipe_id}/bookmarks")
+async def delete_recipe_bookmark(
+    recipe_id: int,
+    user_id: int = Depends(get_user_id),
+    db: AsyncSession = Depends(get_db)
+):
+    bookmarked = await RecipeService.toggle_bookmark(
+        db, recipe_id, user_id, False
+    )
+
+    return {"is_bookmarked": bookmarked}
