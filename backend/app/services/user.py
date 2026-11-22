@@ -60,6 +60,8 @@ class UserService:
             # Refresh Token DB 저장
             await UserCrud.update_refresh_token_by_id(db, user.user_id, refresh_token)
             await db.commit()
+            # commit 후 만료된 ORM 속성을 비동기로 다시 읽습니다.
+            await db.refresh(user)
             return UserRead.model_validate(user), access_token, refresh_token
         except Exception:
             await db.rollback()

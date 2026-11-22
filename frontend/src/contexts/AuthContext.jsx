@@ -1,24 +1,22 @@
 // 담당: 조현기
 // 로그인 정보를 모든 페이지에서 같이 쓰기 위한 파일 
-// 서버 요청은 src/api.js의 api를 쓴다. 백엔드를 시작할 때 TODO 자리에 추가한다.
+// 로그인 · 로그인 유지 · 로그아웃은 공통 api 인스턴스로 요청합니다.
 // (아래 eslint 주석: 이 파일은 AuthProvider와 useAuth를 같이 내보내서 생기는 경고를 끈다. 실행에는 문제 없음)
 /* eslint-disable react-refresh/only-export-components */
-import { useState, createContext, useContext } from "react";
+import { useState, useEffect, createContext, useContext } from "react";
 import { useNavigate } from "react-router-dom";
 import { LOGIN_ID_MIN, LOGIN_ID_MAX, NICKNAME_MIN, PASSWORD_MIN } from "../constants";
-import { mockUser } from "../mockData";
-
-// 개발용 가짜 로그인: true로 바꾸면 로그인한 상태(mockUser)로 시작한다.
-// 마이페이지 · 내 글 수정처럼 로그인 화면을 만들 때만 켜고, 커밋할 때는 false로 둔다.
-const DEV_LOGIN = false;
+import api from "../api";
+import Swal from "sweetalert2";
 
 // Context를 먼저 정의
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
   const [error, setError] = useState("");
-  const [isAuthenticated, setIsAuthenticated] = useState(DEV_LOGIN);
-  const [user, setUser] = useState(DEV_LOGIN ? mockUser : null); // { user_id, login_id, email, nickname }
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [user, setUser] = useState(null);
+  const isAuthenticated = user !== null;
   const navigate = useNavigate();
 
   // 로그인: 아이디 + 비밀번호, 성공하면 true (이메일은 회원가입 인증 · 비밀번호 찾기에만 씀)
@@ -28,13 +26,15 @@ export const AuthProvider = ({ children }) => {
       setError("아이디와 비밀번호를 입력하세요.");
       return false;
     }
-    // TODO 백엔드 시작 시 추가
-    // const response = await api.post("/auth/login", { login_id, password });
-    // 성공하면 setUser(response.data), setIsAuthenticated(true), verifyJWT()
-    // DB 연결 전 UI 확인용 임시 로그인. 실제 계정 인증은 하지 않음
-    setUser(mockUser);
-    setIsAuthenticated(true);
-    return true;
+    try {
+      const { data } = await api.post("/auth/login", { login_id: login_id.trim(), password });
+      setUser(data);
+      return true;
+    } catch (err) {
+      const detail = err.response?.data?.detail;
+      setError(typeof detail === "string" ? detail : "로그인 서버에 연결할 수 없습니다. 다시 시도해 주세요.");
+      return false;
+    }
   };
 
   // 회원가입: 입력값을 먼저 확인하고, 성공하면 true
@@ -67,22 +67,47 @@ export const AuthProvider = ({ children }) => {
     return true;
   };
 
-  // 로그아웃: 로그인 정보를 지우고 홈으로
+  // 쿠키는 서버가 삭제합니다. 실패한 경우 로그인 상태를 유지합니다.
   const logout = async () => {
-    // TODO 백엔드 시작 시 추가
-    // await api.post("/auth/logout");
-    setIsAuthenticated(false);
+    try {
+      await api.post("/auth/logout");
+    } catch (err) {
+      if (err.response?.status !== 401) {
+        await Swal.fire("로그아웃 실패", "서버 연결을 확인하고 다시 시도해 주세요.", "error");
+        return;
+      }
+    }
     setUser(null);
+    setError("");
     navigate("/");
   };
 
-  // TODO 백엔드 시작 시 추가
-  // verifyJWT: api.get("/auth/me")로 로그인 상태 확인
-  // useEffect(() => { verifyJWT(); }, []);  → 새로고침해도 로그인 유지
+  useEffect(() => {
+    const controller = new AbortController();
+    const interceptor = api.interceptors.response.use(
+      (response) => response,
+      (err) => {
+        if (err.response?.status === 401) setUser(null);
+        return Promise.reject(err);
+      },
+    );
+    api.get("/users/me", { signal: controller.signal })
+      .then(({ data }) => setUser(data))
+      .catch((err) => {
+        if (err.code !== "ERR_CANCELED" && err.response?.status !== 401) {
+          setError("로그인 상태를 확인하지 못했습니다. 서버 연결을 확인해 주세요.");
+        }
+      })
+      .finally(() => { if (!controller.signal.aborted) setIsAuthLoading(false); });
+    return () => {
+      controller.abort();
+      api.interceptors.response.eject(interceptor);
+    };
+  }, []);
 
   return (
     <AuthContext.Provider
-      value={{ user, isAuthenticated, error, setError, login, signup, logout }}
+      value={{ user, isAuthenticated, isAuthLoading, error, setError, login, signup, logout }}
     >
       {children}
     </AuthContext.Provider>
