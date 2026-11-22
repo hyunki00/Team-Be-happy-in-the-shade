@@ -40,6 +40,7 @@ class CategorySynonym(Base):
 class Recipe(Base):
     __tablename__ = "recipes" #테이블명
 
+    # 레시피 고유 번호와 작성자 ID
     recipe_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(nullable=False)
 
@@ -47,14 +48,15 @@ class Recipe(Base):
     intro: Mapped[str | None] = mapped_column(String(200), nullable=True) #intro는 생략 가능
     image_url: Mapped[str | None] = mapped_column(String(500), nullable=True) #이미지 생략 가능
 
-    #레시피 인분수 입력하지 않으면 기본값 1
+    # 레시피 인분수 입력하지 않으면 기본값 1
     servings: Mapped[int] = mapped_column(nullable=False, server_default="1")
     tool_id: Mapped[int | None] = mapped_column(nullable=True) #도구 생략 가능
 
+    # 레시피 난이도와 조리 시간(분)
     level: Mapped[str] = mapped_column(String(20), nullable=False)
     cooking_time: Mapped[int] = mapped_column(nullable=False)
 
-    ##레시피 등록 시, 생성시간을 현재 시각으로 기록
+    # 레시피 등록 시, 생성시간을 현재 시각으로 기록
     created_at: Mapped[datetime] = mapped_column(nullable=False, server_default=func.now())
     r_category_id: Mapped[int] = mapped_column(nullable=False)
 
@@ -62,6 +64,7 @@ class Recipe(Base):
 class RecipeIngredient(Base):
     __tablename__ = "recipe_ingredients" #테이블명
 
+    # 레시피와 식재료를 연결하는 정보
     recipe_ing_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     recipe_id: Mapped[int] = mapped_column(nullable=False)
     ing_id: Mapped[int] = mapped_column(nullable=False)
@@ -71,6 +74,7 @@ class RecipeIngredient(Base):
 class RecipeStep(Base):
     __tablename__ = "recipe_steps" #테이블명
 
+    # 레시피별 조리 단계 번호와 설명
     step_id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     recipe_id: Mapped[int] = mapped_column(nullable=False)
     step_no: Mapped[int] = mapped_column(nullable=False)
@@ -81,14 +85,20 @@ class RecipeStep(Base):
 class RecipeLike(Base):
     __tablename__ = "recipe_likes" #테이블명
 
+    # 사용자 ID와 레시피 ID를 묶어 복합 기본키로 사용 (같은 레시피에 중복 좋아요 방지)
     user_id: Mapped[int] = mapped_column(primary_key=True)
     recipe_id: Mapped[int] = mapped_column(primary_key=True)
+
+    # 좋아요를 누른 시각
     created_at: Mapped[datetime] = mapped_column(nullable=False, server_default=func.now())
 
 # 레시피 북마크
 class Bookmark(Base):
     __tablename__ = "bookmarks"
 
+    # 사용자 ID와 레시피 ID를 묶어 복합 기본키로 사용 (같은 레시피 중복 저장 방지)
     user_id: Mapped[int] = mapped_column(primary_key=True)
     recipe_id: Mapped[int] = mapped_column(primary_key=True)
+
+    # 북마크를 저장한 시각
     created_at: Mapped[datetime] = mapped_column(nullable=False, server_default=func.now())

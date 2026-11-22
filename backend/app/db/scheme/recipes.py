@@ -23,30 +23,40 @@ class MissingIngredient(BaseModel):
 
 # 레시피 목록의 카드 하나
 class RecipeListItem(BaseModel):
+    # SQLAlchemy 모델 객체의 속성값을 이용해 Pydantic 모델로 변환 가능
     model_config = ConfigDict(from_attributes=True)
 
+    # 레시피 기본 정보
     recipe_id: int
     recipe_title: str
     intro: str | None = None
     image_url: str | None = None
 
+    # 난이도와 조리 시간
     level: str
     cooking_time: int
 
+    # 요리 카테고리 정보
     r_category_id: int
     category_name: str
 
+    # 필요한 조리 도구 정보
     tool_id: int | None = None
     tool_name: str | None = None
 
+    # 레시피 작성자와 작성일
     user_id: int
     nickname: str
     created_at: datetime
 
+    # 레시피의 좋아요 수와 댓글 수
     like_count: int = 0
     comment_count: int = 0
 
+    # 선택한 재료와 레시피 재료의 일치율 (0.0 ~ 1.0)
     match_rate: float | None = None
+
+    # 부족한 재료 목록과 레시피에 필요한 재료 ID 목록
     missing_ingredients: list[MissingIngredient] = Field(default_factory=list)
     ingredient_ids: list[int] = Field(default_factory=list)
 
@@ -67,13 +77,16 @@ class RecipeStepItem(BaseModel):
 
 
 # 레시피 상세 응답
+# RecipeListItem의 필드를 상속받고 상세 페이지에 필요한 정보를 추가
 class RecipeDetail(RecipeListItem):
     servings: int
 
+    # 현재 로그인한 사용자의 좋아요·북마크·작성자 여부
     is_liked: bool = False
     is_bookmarked: bool = False
     is_mine: bool = False
 
+    # 레시피에 필요한 재료 목록과 조리 단계 목록
     ingredients: list[RecipeIngredientItem] = Field(default_factory=list)
     steps: list[RecipeStepItem] = Field(default_factory=list)
 
@@ -84,4 +97,8 @@ class RecipeSearch(BaseModel):
     level: str | None = None
     cooking_time: int | None = Field(default=None, ge=1) #ge=1 : 1 이상
 
+    # 사용자가 검색할 때 선택한 식재료 ID 목록
     ingredient_ids: list[int] = Field(default_factory=list)
+
+    # 조리 시간이 60분을 초과하는 레시피만 검색할지 여부
+    over_60: bool = False

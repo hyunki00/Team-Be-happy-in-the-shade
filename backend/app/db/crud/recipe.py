@@ -19,19 +19,21 @@ from app.db.models.ingredients import Ingredient
 from app.db.scheme.recipes import RecipeIngredientItem, RecipeStepItem
 from app.db.models.recipe_comments import RecipeComment
 
-
+# users 테이블에서 작성자 ID와 닉네임을 조회하기 위한 테이블 정의
 users_t = table(
     "users",
     column("user_id"),
     column("nickname")
 )
 
+# 사용자의 냉장고 재료 ID를 조회하기 위한 테이블 정의
 user_ingredients_t = table(
     "user_ingredients",
     column("user_id"),
     column("ing_id")
 )
 
+# 레시피 관련 DB 조회 및 추가·삭제를 담당하는 클래스
 class RecipeCrud:
 
     # 레시피 목록 조회
@@ -68,6 +70,12 @@ class RecipeCrud:
                     Recipe.cooking_time <= search.cooking_time
                 )
 
+            # 60분 초과 레시피 검색
+            if search.over_60:
+                stmt = stmt.where(
+                    Recipe.cooking_time > 60
+                )
+
         # 정렬
         stmt = stmt.order_by(
             Recipe.recipe_title.asc(),
@@ -78,6 +86,7 @@ class RecipeCrud:
         if limit is not None:
             stmt = stmt.limit(limit).offset(offset)
 
+        # SQL 실행 후 조회한 Recipe 객체들을 리스트로 반환
         result = await db.execute(stmt)
         return list(result.scalars().all()) #db.execute()로 조회한 결과에서 Recipe 객체들만 꺼내 리스트 만듦
 
@@ -109,6 +118,7 @@ class RecipeCrud:
         user_id: int,
         recipe_id: int
     ) -> None:
+        # 사용자의 좋아요 기록 생성
         like = RecipeLike(user_id=user_id, recipe_id=recipe_id)
         db.add(like)
         await db.flush()
@@ -136,6 +146,7 @@ class RecipeCrud:
         user_id: int,
         recipe_id: int
     ) -> None:
+        # 사용자의 북마크 기록 생성
         bookmark = Bookmark(user_id=user_id, recipe_id=recipe_id)
         db.add(bookmark)
         await db.flush()
@@ -147,6 +158,7 @@ class RecipeCrud:
         user_id: int,
         recipe_id: int
     ) -> bool:
+        # 사용자가 저장한 북마크 기록 조회
         bookmark = await db.get(Bookmark, (user_id, recipe_id))
 
         if bookmark is None:
@@ -163,6 +175,7 @@ class RecipeCrud:
         recipe_id: int
     ) -> list[RecipeIngredientItem]:
 
+        # 레시피 재료 테이블과 식재료 테이블을 JOIN하여 조회
         stmt = (
             select(
                 RecipeIngredient.ing_id,
@@ -179,6 +192,7 @@ class RecipeCrud:
 
         result = await db.execute(stmt)
 
+        # 조회한 재료 정보를 Pydantic 스키마 형태로 변환
         return [
             RecipeIngredientItem(
                 ing_id=row.ing_id,
@@ -203,6 +217,7 @@ class RecipeCrud:
 
         result = await db.execute(stmt)
 
+        # 조회한 조리 단계를 Pydantic 스키마 형태로 변환
         return [
             RecipeStepItem.model_validate(step, from_attributes=True)
             for step in result.scalars().all()
@@ -214,7 +229,7 @@ class RecipeCrud:
         db: AsyncSession,
         recipe_id: int
     ) -> int:
-        #func.count() : SELECT COUNT(*) FROM recipe_likes WHERE recipe_id = 778;
+        #func.count() : 해당 recipe_id의 좋아요 기록 개수를 COUNT(*)로 조회
         stmt = select(func.count()).select_from(RecipeLike).where(
             RecipeLike.recipe_id == recipe_id
         )
@@ -285,13 +300,14 @@ class RecipeCrud:
         result = await db.execute(stmt)
         return list(result.scalars().all())
 
-        # 레시피 카테고리 이름 조회
+    # 레시피 카테고리 이름 조회
     @staticmethod
     async def get_category_name(
         db: AsyncSession,
         r_category_id: int
     ) -> str | None:
 
+        # 레시피 카테고리 이름을 조회하기 위한 테이블 정의
         categories_t = table(
             "recipe_categories",
             column("r_category_id"),
@@ -315,6 +331,7 @@ class RecipeCrud:
         if tool_id is None:
             return None
 
+        # 조리 도구 이름을 조회하기 위한 테이블 정의
         tools_t = table(
             "standard_tools",
             column("tool_id"),
