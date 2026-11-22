@@ -12,8 +12,8 @@
 
 from datetime import datetime
 from typing import Optional
-from sqlalchemy import String, Text, DateTime, func
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import DateTime, String, Text, func
+from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
 from app.db.database import Base
 from sqlalchemy.orm import relationship, foreign
 
