@@ -3,6 +3,7 @@
 //   1. 인라인 style(폭 220px) → 흰 둥근 카드. 폭은 카드를 놓는 쪽(목록 · 메인 · 냉장고)의 칸에 맞춤
 //   2. 사진을 카드 위에 꽉 차게 (4:3), 사진 주소가 없으면 빈 자리 색을 보여 줌
 //   3. 조리 시간 · 난이도 · 작성자를 한 줄로, 일치율은 막대 + 숫자, 부족한 재료는 연한 빨간 칩으로
+//   4. 마우스를 올렸을 때 움직임은 위치(transform)만 바뀌게 (빠른 스크롤 때 글자가 카드 밖으로 튀어 보이는 문제 줄임)
 import { Link } from "react-router-dom";
 
 //recipe : 부모 컴포넌트(RecipeListPage.jsx)가 전달하는 레시피 한 개
@@ -12,7 +13,7 @@ function RecipeCard({recipe, showMatch=false}) {
   return (
     <Link
       to={`/recipes/${recipe.recipe_id}`}
-      className="group block h-full overflow-hidden rounded-card bg-surface shadow-card transition hover:-translate-y-0.5"
+      className="group block h-full overflow-hidden rounded-card bg-surface shadow-card transition-transform duration-150 hover:-translate-y-0.5"
     >
       {recipe.image_url ? (
         <img
