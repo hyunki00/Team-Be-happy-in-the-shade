@@ -1,4 +1,8 @@
 // 담당: 오효정 (임시화면입니다~)
+// [디자인 11/22 조현기] 시안 F 적용 — className(모양)만 바꿈, 인증 · 변경 로직은 그대로
+//   1. 가운데 흰 카드(최대 440px), 입력칸 옆 버튼은 회색 알약, 변경 버튼은 포인트색
+//   2. 오류: 인라인 style(color: red) → 연한 빨간 상자, 안내 문구는 흐린 글씨
+//   3. 입력칸에 aria-label 추가 (라벨이 없어서 화면 읽기 프로그램이 이름을 몰랐음)
 
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -113,24 +117,29 @@ export default function ResetPasswordPage() {
     window.alert('비밀번호 변경 기능은 DB 연결 후 제공될 예정입니다.');
   };
 
+  const rowClass = "flex gap-2";
+  const sideButton = "h-12 flex-none rounded-pill bg-gray-100 px-4 text-sm font-bold hover:bg-gray-200";
+
   return (
-    <div>
-      <h2>비밀번호 찾기</h2>
+    <div className="mx-auto mt-4 flex max-w-[440px] flex-col gap-5 rounded-card bg-surface p-8 shadow-card md:p-10">
+      <h2 className="text-3xl font-black">비밀번호 찾기</h2>
 
       {step === 'verify' ? (
-        <div>
-          <p>가입한 이메일을 인증해주세요.</p>
+        <div className="flex flex-col gap-3">
+          <p className="text-muted">가입한 이메일을 인증해주세요.</p>
 
-          <input type="email" placeholder="이메일" value={form.email} onChange={(e) => update('email', e.target.value)}/>
+          <div className={rowClass}>
+            <input type="email" placeholder="이메일" aria-label="이메일" className="h-12 min-w-0 flex-1" value={form.email} onChange={(e) => update('email', e.target.value)}/>
 
-          <button type="button" onClick={handleSendCode}>
-            인증번호 받기
-          </button>
+            <button type="button" onClick={handleSendCode} className={sideButton}>
+              인증번호 받기
+            </button>
+          </div>
 
-          <div>
-            <input placeholder="인증번호" value={form.code} onChange={(e) => update('code', e.target.value)}/>
+          <div className={rowClass}>
+            <input placeholder="인증번호" aria-label="인증번호" className="h-12 min-w-0 flex-1" value={form.code} onChange={(e) => update('code', e.target.value)}/>
 
-            <button type="button" onClick={handleVerifyCode}>
+            <button type="button" onClick={handleVerifyCode} className={sideButton}>
               인증 확인
             </button>
           </div>
@@ -138,23 +147,23 @@ export default function ResetPasswordPage() {
 
       ) : (
 
-        <form onSubmit={handleSubmit}>
-          <p>새 비밀번호를 설정해주세요.</p>
+        <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+          <p className="text-muted">새 비밀번호를 설정해주세요.</p>
 
-          <input type="password" placeholder="새 비밀번호" value={form.password} onChange={(e) => update('password', e.target.value)}/>
+          <input type="password" placeholder="새 비밀번호" aria-label="새 비밀번호" className="h-12" value={form.password} onChange={(e) => update('password', e.target.value)}/>
 
-          <input type="password" placeholder="새 비밀번호 확인" value={form.confirmPassword} onChange={(e) => update('confirmPassword', e.target.value)}/>
+          <input type="password" placeholder="새 비밀번호 확인" aria-label="새 비밀번호 확인" className="h-12" value={form.confirmPassword} onChange={(e) => update('confirmPassword', e.target.value)}/>
 
-          <button type="submit">
+          <button type="submit" className="mt-2 h-12 rounded-pill bg-accent font-bold text-white hover:bg-accent-dark">
             비밀번호 변경
           </button>
         </form>
       )}
 
-      {error && <p style={{ color: 'red' }}>{error}</p>}
-      {message && <p>{message}</p>}
+      {error && <p role="alert" className="rounded-[16px] bg-miss-soft px-4 py-3 text-sm text-miss">{error}</p>}
+      {message && <p role="status" className="text-sm text-have">{message}</p>}
 
-      <Link to="/login">로그인으로 돌아가기</Link>
+      <Link to="/login" className="text-center text-sm text-muted hover:text-accent">로그인으로 돌아가기</Link>
     </div>
   );
 }

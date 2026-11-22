@@ -1,5 +1,10 @@
 // 담당: 임유빈 
 // 커뮤니티 게시물 목록 페이지 [임시코드 - 아직 수정중]
+// [디자인 11/22 조현기] 시안 F 적용 — className(모양)만 바꿈, 검색 · 정렬 · 목록 로직은 그대로
+//   1. 글쓰기 · 검색 등 주요 버튼: 검정 → 포인트색(accent), 버튼 · 입력칸은 알약 모양(rounded-pill)
+//   2. 게시글 목록 · 빈 목록 안내: 흰 둥근 카드(rounded-card · shadow-card)
+//   3. 빨강 · 파랑 글씨 → 시안 색(miss · have), 입력칸 포커스 테두리는 포인트색
+//   4. 회색(gray) 클래스는 그대로 둠 — index.css에서 따뜻한 회색으로 바뀌어 있음
 
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -59,11 +64,11 @@ export default function BoardListPage({ posts = mockPosts }) {
     <div className="max-w-4xl mx-auto px-4 py-6">
       {/* 타이틀 및 헤더 영역 */}
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">커뮤니티</h1>
+        <h1 className="text-3xl font-black text-ink">커뮤니티</h1>
         {/* 글쓰기 버튼 */}
         <button
           onClick={() => navigate('/board/new')}
-          className="bg-gray-900 hover:bg-gray-800 text-white font-medium px-4 py-2 rounded-lg text-sm flex items-center gap-1.5 transition-colors"
+          className="bg-accent hover:bg-accent-dark text-white font-medium px-4 py-2 rounded-pill text-sm flex items-center gap-1.5 transition-colors"
         >
           <span>✏️</span> 글쓰기
         </button>
@@ -93,7 +98,7 @@ export default function BoardListPage({ posts = mockPosts }) {
           <select
             value={searchType}
             onChange={(e) => setSearchType(e.target.value)}
-            className="border rounded-lg px-2.5 py-1.5 text-sm bg-white text-gray-700 border-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-400"
+            className="border rounded-pill px-2.5 py-1.5 text-sm bg-white text-gray-700 border-gray-300 focus:outline-none focus:ring-2 focus:ring-accent"
           >
             {BOARD_SEARCH_TYPES.map((type) => (
               <option key={type.value} value={type.value}>
@@ -106,11 +111,11 @@ export default function BoardListPage({ posts = mockPosts }) {
             placeholder="검색어를 입력하세요"
             value={searchKeyword}
             onChange={(e) => setSearchKeyword(e.target.value)}
-            className="border rounded-lg px-3 py-1.5 text-sm flex-1 sm:w-48 border-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-400"
+            className="border rounded-pill px-3 py-1.5 text-sm flex-1 sm:w-48 border-gray-300 focus:outline-none focus:ring-2 focus:ring-accent"
           />
           <button
             type="submit"
-            className="bg-gray-800 text-white px-3.5 py-1.5 rounded-lg text-sm font-medium hover:bg-gray-900 transition-colors"
+            className="bg-accent text-white px-3.5 py-1.5 rounded-pill text-sm font-medium hover:bg-accent-dark transition-colors"
           >
             검색
           </button>
@@ -120,13 +125,13 @@ export default function BoardListPage({ posts = mockPosts }) {
       {/* 게시글 목록 영역 */}
       {filteredPosts.length === 0 ? (
         // 빈 화면 처리 (글이 없거나 검색 결과가 없을 때)
-        <div className="py-16 text-center border rounded-lg bg-gray-50 my-6">
+        <div className="py-16 text-center rounded-card bg-surface shadow-card my-6">
           {activeKeyword ? (
             <>
               <p className="text-gray-500 font-medium mb-3">검색 결과가 없습니다.</p>
               <button
                 onClick={handleResetSearch}
-                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm hover:bg-gray-300 transition-colors"
+                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-pill text-sm hover:bg-gray-300 transition-colors"
               >
                 검색 초기화
               </button>
@@ -136,7 +141,7 @@ export default function BoardListPage({ posts = mockPosts }) {
               <p className="text-gray-500 font-medium mb-3">등록된 게시글이 없습니다.</p>
               <button
                 onClick={() => navigate('/board/new')}
-                className="px-4 py-2 bg-gray-900 text-white rounded-lg text-sm hover:bg-gray-800 transition-colors"
+                className="px-4 py-2 bg-accent text-white rounded-pill text-sm hover:bg-accent-dark transition-colors"
               >
                 글쓰기
               </button>
@@ -145,7 +150,7 @@ export default function BoardListPage({ posts = mockPosts }) {
         </div>
       ) : (
         // 게시글 리스트
-        <div className="divide-y border-t border-b border-gray-200">
+        <div className="divide-y divide-line rounded-card bg-surface px-4 shadow-card">
           {filteredPosts.map((post) => (
             <div
               key={post.post_id}
@@ -165,10 +170,10 @@ export default function BoardListPage({ posts = mockPosts }) {
                 <div className="flex items-center gap-3 text-xs text-gray-500">
                   <span className="font-medium text-gray-700">{post.nickname || '익명'}</span>
                   <span>{post.created_at || '방금 전'}</span>                  
-                  <span className="flex items-center gap-0.5 text-red-500 font-medium">
+                  <span className="flex items-center gap-0.5 text-miss font-medium">
                     ♡ {post.like_count || 0}
                   </span>
-                  <span className="flex items-center gap-0.5 text-blue-500 font-medium">
+                  <span className="flex items-center gap-0.5 text-have font-medium">
                     💬 {post.comment_count || (post.comments ? post.comments.length : 0)}
                   </span>
                 </div>

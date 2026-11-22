@@ -1,4 +1,6 @@
 // 담당: 오효정 (임시화면입니다~)
+// [디자인 11/22 조현기] 시안 F 적용 — 모양만 바꿈, 로그인 확인 로직은 그대로
+//   1. 로그인 안내 문구를 가운데 흰 카드로 (폼 모양은 RecipeForm에서)
 
 import { useAuth } from '../contexts/AuthContext';
 import RecipeForm from './RecipeForm';
@@ -15,7 +17,7 @@ function RecipeCreatePage() {
   // ③ 로그인 확인 및 화면 출력
 
   if (!isAuthenticated || !user) {
-    return <p>로그인 후 레시피를 작성할 수 있습니다.</p>;
+    return <p className="mx-auto mt-8 max-w-lg rounded-card bg-surface p-10 text-center text-muted shadow-card">로그인 후 레시피를 작성할 수 있습니다.</p>;
   }
 
   return (

@@ -17,12 +17,34 @@
 - 파일은 **폴더 없이 `.jsx` 한 개**로 만든다. `Components/X/index.jsx`처럼 폴더 + `index.jsx` 구조로 만들지 않는다.
 - 아래 ‘폴더 구조’에 없는 파일 · 폴더는 만들지 말고 먼저 물어본다.
 - 초보 팀이 읽을 코드다. 짧고 쉬운 코드, 한국어 주석을 짧게 단다.
-- 스타일(색 · 간격)은 나중에 정한다. 지금은 Tailwind 기본 클래스로 최소한만.
+- 스타일은 아래 ‘디자인 (시안 F)’의 색 이름을 쓴다. `#BF4F24` 같은 색 코드나 `orange-600` 같은 기본 색을 새로 쓰지 않는다.
 - 자기 담당 파일만 고친다. 다른 사람 파일이 필요하면 메신저로 요청한다.
 - `.env`, `node_modules`, `venv`, `__pycache__`는 커밋하지 않는다.
 - `git push --force` 금지. main 브랜치는 팀장(조현기)만 다룬다. 각자 자기 브랜치(hyunki, woojung, hojin, hyojeong, yubin)에서 작업한다.
 - 커밋 메시지에는 어떤 파일의 어느 부분을 고쳤는지 적는다. 예: `feat: FridgePage 재료 카드 목록 추가`
 - 커밋 · push는 내가 요청할 때만 한다.
+
+## 디자인 (시안 F · 따뜻한 카드)
+
+색 · 글꼴 · 기본 모양은 `src/index.css` 한 곳에서만 정한다 (담당: 조현기). 각자 화면에서는 아래 이름을 Tailwind 클래스로 쓴다.
+
+| 이름 | 색 | 쓰는 곳 | 예시 클래스 |
+|---|---|---|---|
+| page | #F7F4EF | 화면 바탕 (이미 깔려 있음) | `bg-page` |
+| surface | #FFFFFF | 카드 바탕 | `bg-surface` |
+| photo | #E9DCCB | 사진이 없을 때 자리 | `bg-photo` |
+| line | #ECE7DF | 구분선 | `border-line`, `divide-line` |
+| ink · ink-soft · muted | #222 · #4A4A4A · #6B6B6B | 기본 글자 · 보조 글자 · 흐린 글자 | `text-ink`, `text-muted` |
+| accent · accent-dark · accent-soft | #BF4F24 · #A3411C · #F5EDE6 | 주요 버튼 · 선택된 메뉴 | `bg-accent text-white hover:bg-accent-dark` |
+| have · have-soft | #2F6B4F · #E3F0E8 | 있는 재료 · 일치율 | `bg-have-soft text-have` |
+| miss · miss-soft | #A8401B · #FBEDE6 | 부족한 재료 · 유통기한 임박 · 오류 | `bg-miss-soft text-miss` |
+
+- 카드: `rounded-card bg-surface shadow-card p-6` (흰 바탕 · 둥글기 28px · 옅은 그림자)
+- 버튼 · 칩: `rounded-pill h-11 px-5` (주요 버튼은 accent, 보조 버튼은 `bg-gray-100`)
+- `gray-50`~`gray-950`은 따뜻한 회색으로 바뀌어 있으니 회색은 그대로 써도 된다.
+- 글꼴은 Noto Sans KR. 제목 굵기는 `font-black`(900) 또는 `font-bold`.
+- 화면 폭 · 좌우 여백은 `App.jsx`의 RootLayout이 정한다 (최대 1152px). 페이지에서 `max-w-6xl` 이하로 쓰면 된다.
+- 시안 화면: 디자인 시안 캔버스의 ‘시안 F’ (메인 · 내 냉장고 · 레시피 상세)
 
 ## 폴더 구조
 

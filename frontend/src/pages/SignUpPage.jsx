@@ -1,4 +1,8 @@
 // 담당: 오효정 (임시화면입니다~)
+// [디자인 11/22 조현기] 시안 F 적용 — className(모양)만 바꿈, 중복 확인 · 이메일 인증 · 가입 로직은 그대로
+//   1. signup-layout · panel · auth-heading · form-field · btn 등은 정의된 CSS가 없어서 적용이 안 되고 있었음 → Tailwind 클래스로 바꿈
+//   2. 가운데 흰 카드(최대 520px), 입력칸 옆 확인 버튼은 회색 알약, 가입 버튼은 포인트색
+//   3. 안내 · 오류 문구: 성공은 초록, 오류는 빨간 상자
 
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -147,53 +151,64 @@ export default function SignUpPage() {
     }
   };
 
+  const fieldClass = "flex flex-col gap-2";
+  const labelClass = "text-sm font-bold";
+  const rowClass = "flex gap-2";
+  const sideButton = "h-12 flex-none rounded-pill bg-gray-100 px-4 text-sm font-bold hover:bg-gray-200 disabled:opacity-40";
+  // 메시지가 '완료' · '가능'이면 초록, 아니면 흐린 글씨
+  const messageClass = (message) =>
+    `text-sm ${/완료|사용 가능/.test(message) ? "text-have font-bold" : "text-muted"}`;
+
   return (
-    <div className="signup-layout panel">
-      <div className="auth-heading">
-        <h1>회원가입</h1>
-        <p>함께 맛있는 레시피를 나눠 보세요.</p>
+    <div className="mx-auto mt-4 max-w-[520px] rounded-card bg-surface p-8 shadow-card md:p-10">
+      <div>
+        <h1 className="text-3xl font-black">회원가입</h1>
+        <p className="mt-2 text-muted">함께 맛있는 레시피를 나눠 보세요.</p>
       </div>
 
-      <form onSubmit={submit}>
+      <form onSubmit={submit} className="mt-8 flex flex-col gap-5">
       {/* 아이디 중목확인 */}
-      <div className="form-field">
-        <label htmlFor="signup-id">아이디</label>
+      <div className={fieldClass}>
+        <label htmlFor="signup-id" className={labelClass}>아이디</label>
 
-        <div>
+        <div className={rowClass}>
           <input id="signup-id" autoComplete="username" placeholder="영문·숫자 4~20자"
+            className="h-12 min-w-0 flex-1"
             pattern="[a-zA-Z0-9]{4,20}" minLength={4} maxLength={20} value={form.login_id}
             onChange={(e) => update('login_id', e.target.value)}
             required
           />
 
-          <button type="button" onClick={checkId}>
+          <button type="button" onClick={checkId} className={sideButton}>
             중복 확인
           </button>
         </div>
-          {idMessage && <p role="status">{idMessage}</p>}
+          {idMessage && <p role="status" className={messageClass(idMessage)}>{idMessage}</p>}
       </div>
 
         {/* 이메일 , 인증번호 요청 버튼 */}
-        <div className="form-field">
-          <label htmlFor="signup-email">이메일</label>
+        <div className={fieldClass}>
+          <label htmlFor="signup-email" className={labelClass}>이메일</label>
 
-          <div>
+          <div className={rowClass}>
             <input id="signup-email" type="email" autoComplete="email" placeholder="example@email.com"
+              className="h-12 min-w-0 flex-1"
               value={form.email} onChange={(e) => update('email', e.target.value)} required
             />
 
-            <button type="button" onClick={sendEmailCode}>
+            <button type="button" onClick={sendEmailCode} className={sideButton}>
               인증번호 받기
             </button>
           </div>
         </div>
 
         {/* 이메일 인증번호 입력 */}
-        <div className="form-field">
-          <label htmlFor="signup-code">이메일 인증번호</label>
+        <div className={fieldClass}>
+          <label htmlFor="signup-code" className={labelClass}>이메일 인증번호</label>
 
-          <div>
+          <div className={rowClass}>
             <input id="signup-code" type="text" inputMode="numeric" autoComplete="one-time-code"
+              className="h-12 min-w-0 flex-1 disabled:bg-gray-50"
               placeholder="인증번호 6자리" maxLength={6} value={verificationCode}
               disabled={!sentEmail || !!verifiedEmail}
               onChange={(e) => {
@@ -201,35 +216,35 @@ export default function SignUpPage() {
               }}
             />
 
-            <button type="button" onClick={verifyEmailCode}
+            <button type="button" onClick={verifyEmailCode} className={sideButton}
               disabled={!sentEmail || verificationCode.length !== 6 || !!verifiedEmail}>
               인증 확인
             </button>
           </div>
-          {emailMessage && <p role="status">{emailMessage}</p>}
+          {emailMessage && <p role="status" className={messageClass(emailMessage)}>{emailMessage}</p>}
         </div>
 
-        <div className="form-field">
-          <label htmlFor="signup-nickname">닉네임</label>
-          <input id="signup-nickname" type="text" autoComplete="nickname"
+        <div className={fieldClass}>
+          <label htmlFor="signup-nickname" className={labelClass}>닉네임</label>
+          <input id="signup-nickname" type="text" autoComplete="nickname" className="h-12"
             placeholder={`최소 ${NICKNAME_MIN}글자`} minLength={NICKNAME_MIN} value={form.nickname}
             onChange={(event) => update('nickname', event.target.value)}
             required
           />
         </div>
 
-        <div className="form-field">
-          <label htmlFor="signup-password">비밀번호</label>
-          <input id="signup-password" type="password" autoComplete="new-password"
+        <div className={fieldClass}>
+          <label htmlFor="signup-password" className={labelClass}>비밀번호</label>
+          <input id="signup-password" type="password" autoComplete="new-password" className="h-12"
             placeholder={`최소 ${PASSWORD_MIN}자리`} minLength={PASSWORD_MIN} value={form.password}
             onChange={(event) => update('password', event.target.value)}
             required
           />
         </div>
 
-        <div className="form-field">
-          <label htmlFor="signup-confirm">비밀번호 확인</label>
-          <input id="signup-confirm" type="password" autoComplete="new-password"
+        <div className={fieldClass}>
+          <label htmlFor="signup-confirm" className={labelClass}>비밀번호 확인</label>
+          <input id="signup-confirm" type="password" autoComplete="new-password" className="h-12"
             value={form.confirmPassword}
             onChange={(event) => update('confirmPassword', event.target.value)}
             required
@@ -237,18 +252,18 @@ export default function SignUpPage() {
         </div>
 
         {error && (
-          <p className="alert-error" role="alert">
+          <p className="rounded-[16px] bg-miss-soft px-4 py-3 text-sm text-miss" role="alert">
             {error}
           </p>
         )}
 
-        <button type="submit" className="btn btn-primary btn-block" disabled={submitting}>
+        <button type="submit" className="mt-2 h-12 rounded-pill bg-accent font-bold text-white hover:bg-accent-dark disabled:opacity-40" disabled={submitting}>
           {submitting ? '가입 중...' : '회원가입'}
         </button>
       </form>
 
-      <p className="auth-bottom">
-        이미 계정이 있으신가요? <Link to="/login">로그인</Link>
+      <p className="mt-6 text-center text-sm text-muted">
+        이미 계정이 있으신가요? <Link to="/login" className="font-bold text-accent">로그인</Link>
       </p>
     </div>
   );

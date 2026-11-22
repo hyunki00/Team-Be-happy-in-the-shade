@@ -1,4 +1,8 @@
 // 담당: 오효정 (임시화면입니다~)
+// [디자인 11/22 조현기] 시안 F 적용 — className(모양)만 바꿈, 사진 · 닉네임 검사 로직은 그대로
+//   1. 위: 둥근 프로필 사진(120px) + 사진 변경 · 삭제 알약 버튼
+//   2. 이메일 · 닉네임: 라벨 위 · 값 아래, 입력칸 최대 400px
+//   3. 변경하기 = 포인트색, 취소 = 회색 / 오류는 연한 빨간 상자
 
 import { useEffect, useRef, useState } from 'react';
 import { IMAGE_MAX_MB, IMAGE_TYPES, NICKNAME_MAX, NICKNAME_MIN } from '../../constants';
@@ -95,39 +99,39 @@ function ProfileEditor({ user }) {
 
   // ③ 로그인 확인 및 화면 출력
   if (!user) {
-    return <p>로그인 후 이용해 주세요.</p>;
+    return <p className="text-muted">로그인 후 이용해 주세요.</p>;
   }
 
   return (
     <section>
-      <h2>프로필 수정</h2>
-      <form onSubmit={handleSubmit}>
-        <div>
+      <h2 className="text-xl font-black">프로필 수정</h2>
+      <form onSubmit={handleSubmit} className="mt-6 flex max-w-[400px] flex-col gap-5">
+        <div className="flex flex-wrap items-center gap-3">
           {formData.profile_image_url ? (
             <img src={formData.profile_image_url} alt="프로필 미리보기"
-              width={120} height={120} className="rounded-full object-cover" />
-          ) : <p>프로필 사진이 없습니다.</p>}
+              width={120} height={120} className="h-[120px] w-[120px] rounded-full object-cover" />
+          ) : <p className="flex h-[120px] w-[120px] items-center justify-center rounded-full bg-gray-100 p-4 text-center text-xs text-muted">프로필 사진이 없습니다.</p>}
           <input ref={fileInputRef} type="file" accept={IMAGE_TYPES.join(',')}
             aria-label="프로필 사진 선택" onChange={handleImageChange} hidden />
-          <button type="button" onClick={() => fileInputRef.current.click()}>사진 변경</button>
-          <button type="button" onClick={handleImageDelete}
+          <button type="button" className="h-10 rounded-pill bg-gray-100 px-4 text-sm font-medium hover:bg-gray-200 disabled:opacity-40" onClick={() => fileInputRef.current.click()}>사진 변경</button>
+          <button type="button" className="h-10 rounded-pill bg-gray-100 px-4 text-sm font-medium hover:bg-gray-200 disabled:opacity-40" onClick={handleImageDelete}
             disabled={!formData.profile_image_url && !isReading}>사진 삭제</button>
-          {isReading && <p role="status">사진을 불러오는 중입니다.</p>}
+          {isReading && <p role="status" className="w-full text-sm text-muted">사진을 불러오는 중입니다.</p>}
         </div>
 
-        <div>
-          <strong>이메일</strong>
-          <p>{user.email}</p>
+        <div className="flex flex-col gap-1">
+          <strong className="text-sm">이메일</strong>
+          <p className="text-muted">{user.email}</p>
         </div>
 
-        <label htmlFor="profile-nickname">닉네임</label>
+        <label htmlFor="profile-nickname" className="-mb-3 text-sm font-bold">닉네임</label>
         <input id="profile-nickname" name="nickname" value={formData.nickname}
-          maxLength={NICKNAME_MAX} onChange={handleChange} required />
-        {error && <p role="alert">{error}</p>}
-        {message && <p role="status">{message}</p>}
-        <div>
-          <button type="submit" disabled={isReading}>변경하기</button>
-          <button type="button" onClick={handleCancel}>취소</button>
+          maxLength={NICKNAME_MAX} onChange={handleChange} required className="h-12" />
+        {error && <p role="alert" className="rounded-[16px] bg-miss-soft px-4 py-3 text-sm text-miss">{error}</p>}
+        {message && <p role="status" className="text-sm text-have">{message}</p>}
+        <div className="flex gap-2">
+          <button type="submit" disabled={isReading} className="h-12 rounded-pill bg-accent px-6 font-bold text-white hover:bg-accent-dark disabled:opacity-40">변경하기</button>
+          <button type="button" onClick={handleCancel} className="h-12 rounded-pill bg-gray-100 px-6 font-medium hover:bg-gray-200">취소</button>
         </div>
       </form>
     </section>

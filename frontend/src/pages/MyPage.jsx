@@ -1,4 +1,8 @@
 // 담당: 오효정 (임시화면입니다~)
+// [디자인 11/22 조현기] 시안 F 적용 — className(모양)만 바꿈, 메뉴 전환 · 목록 로직은 그대로
+//   1. mypage · mypage-layout · mypage-aside 등은 정의된 CSS가 없어서 적용이 안 되고 있었음 → Tailwind 클래스로 바꿈
+//   2. 위: 작은 영문 표시 + 큰 제목, 아래: 왼쪽 프로필 · 메뉴 카드(260px) + 오른쪽 내용 카드
+//   3. 프로필 사진이 없으면 닉네임 첫 글자 동그라미
 
 import { useAuth } from '../contexts/AuthContext'
 import { mockPosts, mockPostComments, mockRecipeComments, mockRecipes } from '../mockData';
@@ -100,28 +104,28 @@ const MyPage = () => {
   };
 
   if (!user) {
-    return <p>로그인 후 이용해 주세요.</p>;
+    return <p className="mx-auto mt-8 max-w-lg rounded-card bg-surface p-10 text-center text-muted shadow-card">로그인 후 이용해 주세요.</p>;
   }
 
   return (
-    <div className="mypage">
-      <header className="mypage-heading">
-        <span>MY SPACE</span>
-        <h1>나의 요리 기록</h1>
-        <p>좋아하는 요리부터 나눈 이야기까지, 한곳에서 모아보세요.</p>
+    <div className="flex flex-col gap-8">
+      <header>
+        <span className="text-sm font-bold tracking-widest text-accent">MY SPACE</span>
+        <h1 className="mt-1 text-3xl font-black">나의 요리 기록</h1>
+        <p className="mt-2 text-muted">좋아하는 요리부터 나눈 이야기까지, 한곳에서 모아보세요.</p>
       </header>
-      <div className="mypage-layout">
-      <aside className="mypage-aside">
-        <div className="mypage-user">
+      <div className="grid items-start gap-6 md:grid-cols-[260px_1fr]">
+      <aside className="flex flex-col gap-4 rounded-card bg-surface p-6 shadow-card">
+        <div className="flex flex-col items-center gap-1 border-b border-line pb-5 text-center">
           {user.profile_image_url ? (
-            <img src={user.profile_image_url} alt="내 프로필" />
-          ) : <span className="mypage-avatar">{user.nickname?.slice(0, 1) || '나'}</span>}
-          <strong>{user.nickname}</strong>
-          <span>오늘도 맛있는 하루</span>
+            <img src={user.profile_image_url} alt="내 프로필" className="mb-2 h-20 w-20 rounded-full object-cover" />
+          ) : <span className="mb-2 flex h-20 w-20 items-center justify-center rounded-full bg-gray-200 text-2xl font-black text-ink-soft">{user.nickname?.slice(0, 1) || '나'}</span>}
+          <strong className="text-lg">{user.nickname}</strong>
+          <span className="text-sm text-muted">오늘도 맛있는 하루</span>
         </div>
       <MypageSidebar activeMenu={activeMenu} onMenuChange={setActiveMenu} onLogout = {logout}/>
       </aside>
-      <div className="mypage-content">
+      <div className="min-w-0 rounded-card bg-surface p-6 shadow-card md:p-8">
       
       {activeMenu === 'profile' && <ProfileEditor user={user} />}
       {activeMenu === 'posts' && <MyPostList posts={myPosts} />}
