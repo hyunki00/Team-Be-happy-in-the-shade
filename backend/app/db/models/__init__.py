@@ -3,5 +3,5 @@ from .ingredients import IngredientCategory, IngCateSynonym, Ingredient, Ingredi
 from .recipe_comments import RecipeComment
 from .users import User                                   
 from .fridges import UserIngredient, StandardTool, MyTool
-# from .recipes import RecipeCategory, CategorySynonym, Recipe, RecipeIngredient, RecipeStep, RecipeLike, Bookmark (권우정)
 from .posts import Post, PostImage, PostLike, PostComment #(임유빈)
+from .recipes import RecipeCategory, CategorySynonym, Recipe, RecipeIngredient, RecipeStep, RecipeLike, Bookmark
