@@ -4,6 +4,7 @@
 //   2. 식재료 선택: 흰 카드 안에 버튼 · 칩으로 정리, <br /> 줄바꿈 대신 칸 나눔
 //   3. 난이도 · 시간 · 요리 종류 · 정렬: 한 줄에 둥근 고르기 칸 (aria-label 추가)
 //   4. 결과: 레시피 카드를 한 줄에 최대 4개씩
+// [기준 변경 11/22 조현기] 일치율 기준 70% → 50% (백엔드 MATCH_RATE와 맞춤): 0.7 → 0.5 두 곳
 import { mockRecipes, mockIngredients, mockIngredientCategories, mockFridge } from "../mockData";
 import RecipeCard from "../components/RecipeCard";
 import { useState, useEffect } from "react";
@@ -99,10 +100,10 @@ function RecipeListPage() {
         : 0;
 
     // 재료를 선택하지 않았으면 전체 표시
-    // 선택했다면 일치율 70% 이상만 표시
+    // 선택했다면 일치율 50% 이상만 표시
     const matchIngredients =
       filters.ingredients.length === 0 ||
-      (recipeIngredients.length > 0 && matchRate >= 0.7);
+      (recipeIngredients.length > 0 && matchRate >= 0.5);
 
     // 선택한 재료가 레시피에 모두 포함되어 있는지 확인
       const matchSelectedIngredients =
@@ -110,12 +111,12 @@ function RecipeListPage() {
         recipeIngredients.includes(ingId)
     );
 
-    // ON일 때 선택 재료 포함 여부와 냉장고 일치율 70% 이상 확인
+    // ON일 때 선택 재료 포함 여부와 냉장고 일치율 50% 이상 확인
     const matchFridge =
       !isAllIngredientsOn ||
       (
         matchSelectedIngredients &&
-        calculateFridgeMatchRate(recipe) >= 0.7
+        calculateFridgeMatchRate(recipe) >= 0.5
       );
 
     //검색, 난이도, 조리시간, 요리 종류 선택 모두 만족해야 출력

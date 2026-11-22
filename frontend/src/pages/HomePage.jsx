@@ -46,7 +46,7 @@ function RecipeCardList({ recipes, showMatch = false, emptyText, columns = 4 }) 
 function HomePage() {
   const { isAuthenticated } = useAuth();
 
-  // 내 냉장고 추천: 서버 GET /fridge/recommendations (일치율 70% 이상, 높은 순으로 줌)
+  // 내 냉장고 추천: 서버 GET /fridge/recommendations (일치율 50% 이상, 높은 순으로 줌)
   const [recommendRecipes, setRecommendRecipes] = useState([]);
   const [recommendTotal, setRecommendTotal] = useState(0); // 배너에 보여 줄 전체 개수
   const [recommendError, setRecommendError] = useState("");

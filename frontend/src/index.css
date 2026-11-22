@@ -49,6 +49,16 @@
 
 /* 2. 기본 모양 (클래스를 안 붙인 태그에도 적용, 클래스를 붙이면 클래스가 이김) */
 @layer base {
+  /* 선 색 기본값: Tailwind v4는 색을 안 쓴 border의 색이 글자색(진한 검정)이라
+     border · border-b · divide-y만 쓴 곳에 굵고 진한 선이 생김 → 연한 선 색으로 바꿈 */
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-line);
+  }
+
   body {
     background-color: var(--color-page);
     color: var(--color-ink);

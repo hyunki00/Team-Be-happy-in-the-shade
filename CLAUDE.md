@@ -60,7 +60,6 @@ frontend/src/
 ├── components/              여러 페이지가 같이 쓰는 컴포넌트
 │   ├── NavBar.jsx
 │   ├── ProtectedRoute.jsx
-│   ├── SearchFilter.jsx
 │   ├── RecipeCard.jsx
 │   ├── IngredientCard.jsx
 │   ├── IngredientForm.jsx
@@ -86,7 +85,6 @@ frontend/src/
 | `contexts/AuthContext.jsx` | — | 조현기 | mini의 `useAuth.jsx`와 같은 내용 |
 | `components/NavBar.jsx` | — | 조현기 | 메뉴: 내 냉장고 · 레시피 검색 · 레시피 쓰기 · 커뮤니티 · 마이페이지 |
 | `components/ProtectedRoute.jsx` | — | 조현기 | 로그인 필요 경로를 감쌈 |
-| `components/SearchFilter.jsx` | — | 조현기 | `RecipeListPage`에서 사용 |
 | `pages/NotFoundPage.jsx` | `*` | 조현기 |  |
 | `pages/LoginPage.jsx` | `/login` | 오효정 |  |
 | `pages/SignUpPage.jsx` | `/signup` | 오효정 | 이메일 인증 |
@@ -94,7 +92,7 @@ frontend/src/
 | `pages/MyPage.jsx` | `/mypage` | 오효정 | 로그인 필요 |
 | `pages/RecipeCreatePage.jsx` | `/recipes/new` | 오효정 | 로그인 필요 |
 | `pages/RecipeEditPage.jsx` | `/recipes/:id/edit` | 오효정 | 로그인 · 본인만 |
-| `components/CommentSection.jsx` | — | 오효정 | `RecipeDetailPage`에서 사용 |
+| `components/CommentSection.jsx` | — | 조현기 (원래 오효정) | `RecipeDetailPage`에서 사용. 레시피 댓글 API(`recipe_comment.py`)와 같은 담당 |
 | `pages/HomePage.jsx` | `/` | 조현기 |  |
 | `pages/FridgePage.jsx` | `/fridge` | 정호진 | 로그인 필요. 조리도구 탭도 이 화면 안 |
 | `components/IngredientForm.jsx` | — | 정호진 | 재료 등록 · 수정 |
@@ -152,7 +150,7 @@ frontend/src/
 
 ## 화면 결정 사항 (와이어프레임 v6)
 
-- 레시피 추천: 냉장고 재료 일치율 70% 이상만. 필수 재료 없음. 70%는 백엔드 설정 `MATCH_RATE`로만 바꾼다 (화면에서 못 바꿈).
+- 레시피 추천: 냉장고 재료 일치율 50% 이상만 (11/22에 70% → 50%). 필수 재료 없음. 기준은 백엔드 설정 `MATCH_RATE`로만 바꾼다 (화면에서 못 바꿈).
 - 보관 위치(냉장 · 냉동 · 실온) 없음.
 - 재료 단위: 육류 `g`(1–999), 음료 `L`, 나머지 `개`(1–99).
 - 내 냉장고는 소비기한 순 정렬. 소비기한이 지난 재료는 확인창을 띄운 뒤 자동 삭제.

@@ -17,8 +17,9 @@ class Settings(BaseSettings):
     access_token_expire_seconds:int=Field(900, alias="ACCESS_TOKEN_EXPIRE")
     refresh_token_expire_seconds:int=Field(604800, alias="REFRESH_TOKEN_EXPIRE")
 
-    # 추천 기준 일치율 (0.7 = 70%). 테스트하면서 .env의 MATCH_RATE로 조절
-    match_rate:float=Field(0.7, alias="MATCH_RATE")
+    # 추천 기준 일치율 (0.5 = 50%). 테스트하면서 .env의 MATCH_RATE로 조절
+    # 11/22 조현기: 70%는 추천이 거의 안 나와서 50%로 낮춤
+    match_rate:float=Field(0.5, alias="MATCH_RATE")
 
     class Config:
         env_file=".env"
