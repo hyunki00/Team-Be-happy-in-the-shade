@@ -127,25 +127,55 @@ class RecipeService:
         user_id: int | None = None,
         limit: int = 20,
         offset: int = 0,
-        min_match_rate: float | None = None
+        min_match_rate: float | None = None,
+        sort: str = "latest"
     ) -> list[RecipeListItem]:
 
         # [병합 11/23] 기준을 따로 안 주면 .env의 MATCH_RATE(기본 0.5)를 씀
         if min_match_rate is None:
             min_match_rate = settings.match_rate
 
+        # 냉장고 우선 검색이면 로그인한 사용자의 재료를 자동 조회
+        if search.fridge_first:
+
+            # 로그인하지 않은 사용자는 냉장고 정보를 조회할 수 없음
+            if user_id is None:
+                return []
+
+            # 내 냉장고 재료 ID 목록 가져오기
+            my_ing_ids = await RecipeCrud.get_user_ingredient_ids(
+                db, user_id
+            )
+
+            # 냉장고가 비어 있으면 검색 결과 없음
+            if not my_ing_ids:
+                return []
+
+            # 냉장고 재료를 검색 조건에 적용
+            search = search.model_copy(
+                update={"ingredient_ids": my_ing_ids}
+            )
+
         # 1. 검색 조건에 맞는 레시피 조회
         # 1-1. 재료 일치율 정렬이 필요하면 전체 후보를 조회
         if search.ingredient_ids:
             recipes = await RecipeCrud.get_list(
-                db, search, limit=None
+                db, search, limit=None, sort=sort
             )
 
         # 1-2. 일반 목록 검색은 필요한 페이지만 조회
         else:
             recipes = await RecipeCrud.get_list(
-                db, search, limit=limit, offset=offset
+                db, search, limit=limit, offset=offset, sort=sort
             )
+
+        # 로그인한 사용자의 조리도구 목록 조회
+        my_tool_ids = []
+
+        if user_id is not None:
+            my_tool_ids = await RecipeCrud.get_user_tool_ids(
+                db, user_id
+            )    
 
         # 검색 결과를 프론트엔드용 레시피 카드 데이터로 모을 목록
         results = []
@@ -212,6 +242,11 @@ class RecipeService:
                     category_name=category_name or "",
                     tool_id=recipe.tool_id,
                     tool_name=tool_name,
+                    can_cook_with_my_tools=(
+                        user_id is not None
+                        and recipe.tool_id is not None
+                        and recipe.tool_id in my_tool_ids
+                    ),
                     user_id=recipe.user_id,
                     nickname=nickname or "",
                     created_at=recipe.created_at,
@@ -226,9 +261,12 @@ class RecipeService:
         # 4. 재료 검색
         if search.ingredient_ids:
 
-            # 4-1. 일치율 높은 순서로 정렬
+            # 4-1. 일치율 높은 순 → 같은 일치율이면 내 도구로 가능한 레시피 우선
             results.sort(
-                key=lambda recipe: recipe.match_rate or 0,
+                key=lambda recipe: (
+                    recipe.match_rate or 0, # 재료 일치율 높은 순
+                    recipe.can_cook_with_my_tools # 일치율이 같으면 True 우선
+                ),
                 reverse=True
             )
 
@@ -285,9 +323,12 @@ class RecipeService:
             and recipe.match_rate >= settings.match_rate
         ]
 
-        # 5. 일치율 높은 순 정렬
+        # 5. 일치율 높은 순 → 같으면 내 도구로 만들 수 있는 레시피 우선
         recommended.sort(
-            key=lambda recipe: recipe.match_rate,
+            key=lambda recipe: (
+                recipe.match_rate or 0,
+                recipe.can_cook_with_my_tools
+            ),
             reverse=True
         )
 
