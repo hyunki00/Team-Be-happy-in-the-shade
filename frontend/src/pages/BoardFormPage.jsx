@@ -8,16 +8,16 @@
 // 후기작성 경로 [아직 수정/작성중..]
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import { mockPosts, mockRecipes } from '../mockData';
+import api from '../api'; 
 import { BOARD_TITLE_MAX, BOARD_CONTENT_MAX, BOARD_IMAGE_MAX_COUNT, IMAGE_MAX_MB } from '../constants';
 import { useAuth } from '../contexts/AuthContext';
 
-export default function BoardFormPage({ posts = mockPosts, onSavePost }) {
+export default function BoardFormPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { id } = useParams(); // id가 있으면 수정 모드
   const isEditMode = Boolean(id);
-  const { user } = useAuth();
+  const { isAuthenticated } = useAuth();
 
   // 레시피 상세페이지에서 넘어온 연결 레시피 데이터 확인
   const passedRecipe = location.state?.linkedRecipe;
@@ -27,31 +27,41 @@ export default function BoardFormPage({ posts = mockPosts, onSavePost }) {
   const [content, setContent] = useState('');
   const [images, setImages] = useState([]); // 이미지 URL 배열
   const [linkedRecipe, setLinkedRecipe] = useState(passedRecipe || null); // 선택된 레시피 (선택 1개)
-
+ 
   // 레시피 검색 모달 오픈 상태
   const [isModalOpen, setIsModalOpen] = useState(false);
+  
+  const [isLoadingPost, setIsLoadingPost] = useState(isEditMode);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // 수정 모드일 경우 기존 데이터 불러오기
-  useEffect(() => {
-    if (isEditMode) {
-      const targetPost = posts.find((p) => String(p.post_id) === String(id));
-      
-      // 수정하려는 글이 존재하지 않은 경우 추가(없는 게시글수정 주소로 들어갈 경우)
-      if (!targetPost) {
+useEffect(() => {
+  if (isEditMode) {
+    const controller = new AbortController();
+
+    api
+      .get(`/posts/${id}`, { signal: controller.signal })
+      .then(({ data }) => {
+        setTitle(data.title || '');
+        setContent(data.content || '');
+        const loadedImages = Array.isArray(data.images)
+          ? data.images.map((img) => (typeof img === 'string' ? img : img.image_url)).filter(Boolean)
+          : [];
+
+        setImages(loadedImages);
+        setLinkedRecipe(data.linked_recipe || null);
+      })
+      .catch((err) => {
+        if (err.code === 'ERR_CANCELED') return;
         alert('존재하지 않거나 이미 삭제된 게시글입니다.');
-        navigate('/board', { replace: true }); // 목록으로 강제 이동
-        return;
-      }
+        navigate('/board', { replace: true });
+      });
 
-      setTitle(targetPost.title || '');
-      setContent(targetPost.content || '');
-      setImages(targetPost.images || []);
-      setLinkedRecipe(targetPost.linked_recipe || null);
-    }
-  }, [id, isEditMode, posts, navigate]);
+    return () => controller.abort();
 
-  // 필수 조건 충족 여부 (제목, 본문 공백 불가)
-  const isValid = title.trim() !== '' && content.trim() !== '';
+  }
+}, [id, isEditMode, navigate]);
+
+const isValid = title.trim() !== '' && content.trim() !== '' && !isSubmitting;
 
   // 이미지 추가 핸들러 (최대 5장 제한(가안))
   const handleImageChange = (e) => {
@@ -64,8 +74,8 @@ export default function BoardFormPage({ posts = mockPosts, onSavePost }) {
     const newImageUrls = files.map((file) => URL.createObjectURL(file));
     setImages((prev) => [...prev, ...newImageUrls]);
   };
-
-    // 이미지 삭제
+  
+  // 이미지 삭제
   const handleRemoveImage = (indexToRemove) => {
     setImages((prev) => prev.filter((_, index) => index !== indexToRemove));
   };
@@ -77,34 +87,39 @@ export default function BoardFormPage({ posts = mockPosts, onSavePost }) {
     }
     navigate(-1);
   };
-
+ 
   // 등록 및 수정 제출 처리
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!isValid) return;
 
-    const postData = {
-      post_id: isEditMode ? Number(id) : Date.now(),
-      title: title.trim(),
-      content: content.trim(),
-      images: images.map((url, idx) => ({
-        image_id: idx + 1,
-        image_url: url,
-        image_order: idx + 1,
-      })),
-      // 레시피를 선택한 후 글을 작성하면 linked_recipe 키가 동적으로 생성되도록 전개 연산자 적용
-      ...(linkedRecipe && { linked_recipe: linkedRecipe }),
-      nickname: user?.nickname || '익명',
-      created_at: isEditMode ? undefined : '방금 전', //백엔드와 연동하면 자동으로 바뀌는?
-      is_edited: isEditMode ? true : undefined,
-    };
-
-    if (onSavePost) {
-      onSavePost(postData, isEditMode);
+    if (!isAuthenticated) {
+      alert('로그인이 필요한 서비스입니다.');
+      navigate('/login');
+      return;
     }
 
-    alert(isEditMode ? '수정이 완료되었습니다.' : '게시글이 등록되었습니다.');
-    navigate(isEditMode ? `/board/${id}` : '/board');
+    setIsSubmitting(true);
+    try {
+      const payload = {
+        title: title.trim(),
+        content: content.trim(),
+        images,
+      };
+
+      const { data } = isEditMode
+        ? await api.patch(`/posts/${id}`, payload)
+        : await api.post('/posts', payload);
+
+      alert(isEditMode ? '수정이 완료되었습니다.' : '게시글이 등록되었습니다.');
+      navigate(`/board/${data.post_id}`);
+
+    } catch (err) {
+      alert(isEditMode ? '게시글 수정에 실패했습니다.' : '게시글 등록에 실패했습니다.');
+
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -114,7 +129,7 @@ export default function BoardFormPage({ posts = mockPosts, onSavePost }) {
       </h1>
 
       <form onSubmit={handleSubmit} className="space-y-6 bg-white p-6 rounded-card shadow-card">
-
+        
         {/* 1. 제목 입력 */}
         <div>
           <div className="flex justify-between items-center mb-1">
@@ -246,7 +261,6 @@ export default function BoardFormPage({ posts = mockPosts, onSavePost }) {
 
       </form>
 
-      {/* 5. 레시피 검색 모달 (배경 딤 처리 + 스크롤 지원 + 제목 실시간 자동 검색) */}
       {isModalOpen && (
         <RecipeSearchModal
           onClose={() => setIsModalOpen(false)}
@@ -261,35 +275,48 @@ export default function BoardFormPage({ posts = mockPosts, onSavePost }) {
 }
 
 // ----------------------------------------------------------------------
-// 팝업(모달) 서브 컴포넌트
+// 팝업(모달) 서브 컴포넌트 [API 변경] mockRecipes 대신 GET /recipes?keyword=... 호출
 // ----------------------------------------------------------------------
 function RecipeSearchModal({ onClose, onSelect }) {
   const [searchTerm, setSearchTerm] = useState('');
-  
-  // 검색어(recipe_title 기준)에 일치하는 레시피 필터링
-  // 검색어가 없으면([]) 아무것도 안 뜨도록 설정
-  const filteredRecipes = searchTerm.trim() === '' 
-    ? [] 
-    : mockRecipes.filter((r) => r.recipe_title.toLowerCase().includes(searchTerm.toLowerCase()));
+  const [results, setResults] = useState([]);
+
+  useEffect(() => {
+    const trimmed = searchTerm.trim();
+    if (!trimmed) {
+      setResults([]);
+      return;
+    }
+
+    const controller = new AbortController();
+    api
+      .get('/recipes', { params: { keyword: trimmed}, signal: controller.signal })
+      .then(({ data }) => setResults(data))
+      .catch((err) => {
+        if (err.code !== 'ERR_CANCELED') setResults([]);
+      });
+
+    return () => controller.abort();
+  }, [searchTerm]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
       {/* 모달 창 본체 */}
       <div className="bg-white w-full max-w-lg rounded-card shadow-card overflow-hidden flex flex-col max-h-[80vh]">
-
+        
         {/* 모달 헤더 */}
         <div className="px-6 py-4 border-b flex justify-between items-center">
           <h3 className="text-lg font-bold text-gray-900">레시피 검색 및 연결</h3>
-          <button 
-            type="button" 
-            onClick={onClose} 
+          <button
+            type="button"
+            onClick={onClose}
             className="text-gray-400 hover:text-gray-600 text-xl font-bold px-2"
-            >
-              ✕
-              </button>
+          >
+            ✕
+          </button>
         </div>
 
-        {/* 상단 검색 입력창 */}        
+        {/* 상단 검색 입력창 */}
         <div className="p-4 border-b bg-gray-50">
           <input
             type="text"
@@ -306,13 +333,13 @@ function RecipeSearchModal({ onClose, onSelect }) {
           {searchTerm.trim() === '' ? (
             <div className="text-center py-12 text-gray-400 text-sm">
               검색어를 입력하면 일치하는 레시피가 자동으로 표시됩니다.
-              </div>
-          ) : filteredRecipes.length === 0 ? (
+            </div>
+          ) : results.length === 0 ? (
             <div className="text-center py-12 text-gray-400 text-sm">
               검색 결과가 없습니다.
-              </div>
+            </div>
           ) : (
-            filteredRecipes.map((recipe) => (
+            results.map((recipe) => (
               <div
                 key={recipe.recipe_id}
                 onClick={() => onSelect(recipe)}
@@ -329,7 +356,7 @@ function RecipeSearchModal({ onClose, onSelect }) {
                 </div>
                 <span className="text-xs font-semibold text-gray-700 bg-gray-100 px-3 py-1.5 rounded-pill">
                   선택
-                  </span>
+                </span>
               </div>
             ))
           )}
@@ -337,13 +364,13 @@ function RecipeSearchModal({ onClose, onSelect }) {
 
         {/* 모달 푸터 */}
         <div className="px-6 py-3 border-t bg-gray-50 flex justify-end">
-          <button 
-            type="button" 
-            onClick={onClose} 
+          <button
+            type="button"
+            onClick={onClose}
             className="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-medium rounded-pill hover:bg-gray-300 transition-colors"
-            >
-              닫기
-              </button>
+          >
+            닫기
+          </button>
         </div>
 
       </div>

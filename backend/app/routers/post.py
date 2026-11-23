@@ -95,26 +95,24 @@ async def delete_post(
 
 
 
-# --- 좋아요 ---
-
-# 좋아요 추가/토글
+## 좋아요 추가 ##
 @router.post("/posts/{post_id}/likes")
 async def add_post_like(
     post_id: int,
     db: AsyncSession = Depends(get_db),
-    user_id: int = Depends(get_user_id),  
+    user_id: int = Depends(get_user_id),
 ):
-    return await PostService.toggle_like(db=db, user_id=user_id, post_id=post_id)
+    return await PostService.add_like(db=db, user_id=user_id, post_id=post_id)
 
 
-# 좋아요 취소/토글
+## 좋아요 취소 ##
 @router.delete("/posts/{post_id}/likes")
 async def remove_post_like(
     post_id: int,
     db: AsyncSession = Depends(get_db),
-    user_id: int = Depends(get_user_id),  
+    user_id: int = Depends(get_user_id),
 ):
-    return await PostService.toggle_like(db=db, user_id=user_id, post_id=post_id)
+    return await PostService.remove_like(db=db, user_id=user_id, post_id=post_id)
 
 
 
