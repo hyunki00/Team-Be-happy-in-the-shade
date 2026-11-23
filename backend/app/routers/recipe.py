@@ -19,9 +19,17 @@ from app.db.database import get_db
 from app.db.scheme.recipes import RecipeDetail, RecipeListItem, RecipeSearch
 from app.services.recipe import RecipeService
 
-
+# 레시피 관련 API의 공통 URL 경로와 Swagger 태그 설정
 router = APIRouter(prefix="/recipes", tags=["recipes"])
 
+
+# 로그인한 사용자의 냉장고 재료 기반 레시피 추천
+@router.get("/recommendations", response_model=list[RecipeListItem])
+async def get_recipe_recommendations(
+    user_id: int = Depends(get_user_id),
+    db: AsyncSession = Depends(get_db)
+):
+    return await RecipeService.recommend(db, user_id)
 
 # 1. 레시피 목록 / 검색
 @router.get("", response_model=list[RecipeListItem])
@@ -34,16 +42,20 @@ async def get_recipes(
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     user_id: int | None = Depends(get_optional),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    over_60: bool = False
 ):
+    # URL로 전달받은 검색 조건을 RecipeSearch 객체로 묶기
     search = RecipeSearch(
         keyword=keyword,
         r_category_id=r_category_id,
         level=level,
         cooking_time=cooking_time,
-        ingredient_ids=ingredient_ids
+        ingredient_ids=ingredient_ids,
+        over_60=over_60
     )
 
+    # 검색 조건에 맞는 레시피 목록을 서비스에서 조회
     return await RecipeService.search(
         db, search, user_id, limit, offset
     )
@@ -68,6 +80,7 @@ async def add_recipe_like(
     user_id: int = Depends(get_user_id),
     db: AsyncSession = Depends(get_db)
 ):
+    # 좋아요 추가를 요청하고 변경된 상태를 저장
     liked = await RecipeService.toggle_like(
         db, recipe_id, user_id, True
     )
@@ -82,6 +95,7 @@ async def delete_recipe_like(
     user_id: int = Depends(get_user_id),
     db: AsyncSession = Depends(get_db)
 ):
+    # 좋아요 취소를 요청하고 변경된 상태를 저장
     liked = await RecipeService.toggle_like(
         db, recipe_id, user_id, False
     )
@@ -96,6 +110,7 @@ async def add_recipe_bookmark(
     user_id: int = Depends(get_user_id),
     db: AsyncSession = Depends(get_db)
 ):
+    # 북마크 추가를 요청하고 변경된 상태를 저장
     bookmarked = await RecipeService.toggle_bookmark(
         db, recipe_id, user_id, True
     )
@@ -110,6 +125,7 @@ async def delete_recipe_bookmark(
     user_id: int = Depends(get_user_id),
     db: AsyncSession = Depends(get_db)
 ):
+    # 북마크 취소를 요청하고 변경된 상태를 저장
     bookmarked = await RecipeService.toggle_bookmark(
         db, recipe_id, user_id, False
     )

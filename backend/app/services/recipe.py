@@ -2,13 +2,14 @@
 # 할 일: class RecipeService
 #   search / get_detail / toggle_like / toggle_bookmark   (비로그인이면 user_id가 None)
 #   calc_match_rate(recipe_ing_ids, my_ing_ids)  내 냉장고에 있는 재료 수 ÷ 레시피 재료 수
-#   recommend(db, user_id)  settings.match_rate(.env의 MATCH_RATE, 기본 0.7) 이상만
+#   recommend(db, user_id)  settings.match_rate(.env의 MATCH_RATE, 기본 0.5) 이상만
+# [병합 11/23 조현기] 재료 검색 일치율 기준을 0.7 고정 → settings.match_rate(0.5)로 (추천 · 검색 기준을 하나로)
 #   ※ recommend는 정호진의 /fridge/recommendations가 부름
 #   ※ 재료를 고르면 일치율순, 안 고르면 가나다순
 #
 # - mini의 serivces/user.py 모양: crud를 부르고, 안 되는 경우는 HTTPException(status_code, detail)으로 막기
 # - 404 없음 / 403 남의 것 / 400 잘못된 값 / 401 로그인 필요
-# - commit은 여기서. 실패하면 rollback
+# - commit은 여기서. 실패하면 rollback -261122 권우정 추가 : (현재 함수에 명시적인 rollback 처리는 없음)
 # - 다 만들면 app/services/__init__.py에 import 한 줄 추가
 
 from fastapi import HTTPException
@@ -18,8 +19,10 @@ from app.db.crud.recipe import RecipeCrud
 from app.db.scheme.recipes import RecipeDetail, RecipeListItem, RecipeSearch
 from app.core.settings import settings
 
+# 레시피 검색, 상세 조회, 추천 및 좋아요/북마크 처리를 담당하는 서비스 클래스
 class RecipeService:
 
+    # 레시피 재료 중 사용자가 가진 재료의 비율을 계산하는 함수
     @staticmethod
     def calc_match_rate(
         recipe_ing_ids: list[int],
@@ -123,8 +126,13 @@ class RecipeService:
         search: RecipeSearch,
         user_id: int | None = None,
         limit: int = 20,
-        offset: int = 0
+        offset: int = 0,
+        min_match_rate: float | None = None
     ) -> list[RecipeListItem]:
+
+        # [병합 11/23] 기준을 따로 안 주면 .env의 MATCH_RATE(기본 0.5)를 씀
+        if min_match_rate is None:
+            min_match_rate = settings.match_rate
 
         # 1. 검색 조건에 맞는 레시피 조회
         # 1-1. 재료 일치율 정렬이 필요하면 전체 후보를 조회
@@ -139,6 +147,7 @@ class RecipeService:
                 db, search, limit=limit, offset=offset
             )
 
+        # 검색 결과를 프론트엔드용 레시피 카드 데이터로 모을 목록
         results = []
 
         # 2. 각 레시피의 카드 데이터 만들기
@@ -167,6 +176,7 @@ class RecipeService:
                 db, recipe.recipe_id
             )
 
+            # 재료 선택 시 계산할 일치율과 부족한 재료 목록
             match_rate = None
             missing_ingredients = []
 
@@ -213,12 +223,24 @@ class RecipeService:
                 )
             )
 
-        # 4. 재료 검색은 일치율 순으로 정렬 후 페이지 나누기
+        # 4. 재료 검색
         if search.ingredient_ids:
+
+            # 4-1. 일치율 높은 순서로 정렬
             results.sort(
                 key=lambda recipe: recipe.match_rate or 0,
                 reverse=True
             )
+
+            # 4-2. 일치율 기준(MATCH_RATE, 50%) 이상인 레시피만 선택
+            results = [
+                recipe
+                for recipe in results
+                if recipe.match_rate is not None
+                and recipe.match_rate >= min_match_rate
+            ]
+
+            # 4-3. 필터링한 결과를 페이지별로 나누기
             return results[offset:offset + limit]
 
         # 5. 일반 검색은 이미 DB에서 정렬·페이지 처리를 완료함
@@ -251,7 +273,8 @@ class RecipeService:
             search,
             user_id=user_id,
             limit=1000,
-            offset=0
+            offset=0,
+            min_match_rate=settings.match_rate
         )
 
         # 4. 추천 기준 이상의 레시피만 선택
@@ -279,6 +302,7 @@ class RecipeService:
         liked: bool
     ) -> bool:
 
+        # 좋아요를 변경하기 전에 레시피 존재 여부 확인
         recipe = await RecipeCrud.get_by_id(db, recipe_id)
 
         if recipe is None:
@@ -311,6 +335,7 @@ class RecipeService:
         bookmarked: bool
     ) -> bool:
 
+        # 북마크를 변경하기 전에 레시피 존재 여부 확인
         recipe = await RecipeCrud.get_by_id(db, recipe_id)
 
         if recipe is None:
@@ -319,6 +344,7 @@ class RecipeService:
                 detail="레시피를 찾을 수 없습니다."
             )
 
+        # 사용자가 이미 북마크한 레시피인지 확인
         already_bookmarked = await RecipeCrud.has_bookmark(
             db, user_id, recipe_id
         )

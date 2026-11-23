@@ -1,19 +1,16 @@
 // 담당: 권우정
-// [디자인 11/22 조현기] 시안 F + 와이어프레임 p.15~17 레이아웃 적용 — 검색 · 필터 · 정렬 계산 로직은 그대로
-//   1. 위: 검색창 / 아래: 왼쪽 필터(재료 · 요리 종류 · 난이도 · 조리 시간) + 오른쪽 결과
-//      - 난이도 · 시간 · 요리 종류: select → 칩 버튼 (같은 값을 다시 누르면 '전체'), 값은 기존과 같음
-//      - 재료: 고른 재료 칩(✕로 하나씩 빼기 handleIngredientRemove 추가) + '+ 식재료 선택' + '검색 재료 초기화'
-//      - 필터 '초기화' = 기존 handleReset (검색 조건 초기화)
-//   2. 오른쪽 맨 위: '모든 재료 일치' 버튼 → '내 냉장고 재료 우선' 스위치 (켜고 끄는 로직은 그대로)
-//      - 켰을 때만 거르는 방식 안내, 껐을 때는 로그인 전에만 "로그인하면 켤 수 있어요"
-//   3. 결과 개수 + 정렬(select)을 한 줄에, 카드는 한 줄에 최대 3개
-//   4. 식재료 선택: 화면 위에 뜨는 창(모달)으로 (p.16), ✕ · Esc로 닫으면 선택 취소(기존 handleIngredientCancel)
-//   5. 제목 '레시피 목록' → '레시피 검색' (메뉴 이름과 맞춤), '현재 검색어' 확인용 줄은 뺌
-// [기준 변경 11/22 조현기] 일치율 기준 70% → 50% (백엔드 MATCH_RATE와 맞춤): 0.7 → 0.5 두 곳
-import { mockRecipes, mockIngredients, mockIngredientCategories, mockFridge } from "../mockData";
+// [병합 11/23 조현기] woojung 브랜치(DB 연결 · 주석 정리) + main 디자인(11/22) 합침
+//   - 검색 · 필터 · 페이지 · 정렬 로직은 woojung 브랜치 그대로 (mockData → 실제 DB)
+//   - 화면 모양은 main 디자인 그대로 (왼쪽 필터 칩, 위쪽 스위치, 식재료 선택 모달), 아래 페이지 버튼만 새로 꾸밈
+//   - 서버 요청을 직접 주소(127.0.0.1) 대신 api.js로: 프로젝트 규칙(요청은 api.js 하나로)
+//     + 127.0.0.1로 보내면 localhost에서 받은 로그인 쿠키가 같이 안 가는 문제
+//   - 일치율 막대는 재료를 골랐을 때만 표시 (안 고르면 서버가 일치율을 주지 않음)
+//   - '내 냉장고 재료 우선' 스위치는 woojung 브랜치처럼 아직 검색 조건에 반영 안 됨 → 켜면 "준비 중" 안내
+// [디자인 11/22 조현기] 시안 F + 와이어프레임 p.15~17 레이아웃 (왼쪽 필터 칩 · 위쪽 스위치 · 식재료 선택 모달 · 카드 한 줄 최대 3개)
 import RecipeCard from "../components/RecipeCard";
 import { useState, useEffect } from "react";
 import { useAuth } from "../contexts/AuthContext"
+import api from "../api"; // [병합] 공통 api
 
 function RecipeListPage() {
   // 검색 및 필터 조건을 하나의 객체로 관리
@@ -25,6 +22,21 @@ function RecipeListPage() {
     cooking_time: null, //조리 시간
     sort: "name", //정렬
   });  
+
+  // 백엔드에서 조회한 현재 페이지의 레시피 목록
+  const [recipes, setRecipes] = useState([]);
+
+  // 레시피 조회 요청이 진행 중인지 표시
+  const [loading, setLoading] = useState(true);
+
+  // 레시피 조회 실패 시 표시할 오류 메시지
+  const [error, setError] = useState("");
+
+  // 실제 DB에서 가져온 식재료 목록
+  const [ingredients, setIngredients] = useState([]);
+
+  // 실제 DB에서 가져온 식재료 카테고리
+  const [ingredientCategories, setIngredientCategories] = useState([]);
 
   // 사용자가 식재료 선택창에서 고르고 있는 재료 임시로 보관
   const [tempIngredients, setTempIngredients] = useState([]);
@@ -38,145 +50,160 @@ function RecipeListPage() {
   // 식재료 대분류 선택 상태
   const [ingredientCategory, setIngredientCategory] = useState(null);
 
-  // ON/OFF 상태(false : 일반 레시피 검색, true : 내 냉장고 재료 우선 ON)
+  // 모든 재료 일치 버튼의 ON/OFF 상태 (현재는 화면 상태만 변경하며 검색 조건에는 반영되지 않음)
   const [isAllIngredientsOn, setIsAllIngredientsOn] = useState(false);
+
+  // 현재 페이지 번호
+  const [page, setPage] = useState(1);
+
+  // 다음 페이지가 존재하는지
+  const [hasNextPage, setHasNextPage] = useState(false);
+
+  // 한 페이지에 표시할 레시피 수
+  const PAGE_SIZE = 20;
 
   // 로그인 상태 확인
   const { isAuthenticated } = useAuth();
 
-  // 로그아웃하면 내 냉장고 재료 우선 OFF
+  // 검색 조건이나 페이지가 바뀔 때 백엔드에서 레시피를 다시 조회
+  useEffect(() => {
+    // 이전 요청을 취소해 오래된 검색 결과가 화면에 표시되지 않도록 관리
+    const controller = new AbortController();
+
+    // 선택한 검색 조건을 URL 파라미터로 만들어 레시피 목록 요청
+    const fetchRecipes = async () => {
+      setLoading(true);
+      setError("");
+
+      try {
+        // 검색어, 필터, 페이지 번호를 서버에 전달할 쿼리 파라미터
+        const params = new URLSearchParams();
+
+        if (filters.keyword.trim()) {
+          params.append("keyword", filters.keyword.trim());
+        }
+
+        if (filters.r_category_id !== null) {
+          params.append("r_category_id", filters.r_category_id);
+        }
+
+        if (filters.level !== null) {
+          params.append("level", filters.level);
+        }
+
+        if (
+          filters.cooking_time !== null &&
+          filters.cooking_time !== "초과"
+        ) {
+          params.append("cooking_time", filters.cooking_time);
+        }
+
+        if (filters.cooking_time === "초과") {
+          params.append("over_60", "true");
+        }
+
+        filters.ingredients.forEach((ingId) => {
+          params.append("ingredient_ids", ingId);
+        });
+
+        // 화면에는 20개를 보여주지만 21개를 요청해 다음 페이지 존재 여부 확인
+        params.append("limit", PAGE_SIZE + 1);
+        params.append("offset", (page - 1) * PAGE_SIZE);
+
+        // [병합] api.js로 요청 (실패하면 axios가 오류를 던짐)
+        const { data } = await api.get(`/recipes?${params.toString()}`, {
+          signal: controller.signal,
+        });
+
+        // 취소되지 않은 최신 요청의 결과만 반영
+        if (!controller.signal.aborted) {
+          // 21번째 레시피가 있으면 다음 페이지가 존재함
+          setHasNextPage(data.length > PAGE_SIZE);
+
+          // 실제 화면에는 20개만 표시
+          setRecipes(data.slice(0, PAGE_SIZE));
+        }
+
+      } catch (err) {
+        // [병합] axios는 요청 취소를 ERR_CANCELED로 알려 줌
+        if (err.code !== "ERR_CANCELED") {
+          setError("레시피를 불러오지 못했습니다.");
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchRecipes();
+
+    // 검색 조건이 변경되면 이전 요청 취소
+    return () => controller.abort();
+
+  }, [
+    filters.keyword,
+    filters.r_category_id,
+    filters.level,
+    filters.cooking_time,
+    filters.ingredients,
+    page
+  ]);
+
+  // 식재료 목록과 카테고리 가져오기
+  useEffect(() => {
+    // 식재료 목록과 식재료 카테고리를 함께 조회
+    const fetchIngredients = async () => {
+      try {
+        // [병합] api.js로 요청
+        const [{ data: ingredientData }, { data: categoryData }] = await Promise.all([
+          api.get("/ingredients"),
+          api.get("/ingredients/categories"),
+        ]);
+
+        setIngredients(ingredientData);
+        setIngredientCategories(categoryData);
+
+      } catch (err) {
+        console.error("식재료 조회 오류:", err);
+      }
+    };
+
+    fetchIngredients();
+  }, []);
+
+  // 로그아웃하면 모든 재료 일치 기능 OFF
   useEffect(() => {
     if (!isAuthenticated) {
       setIsAllIngredientsOn(false);
     }
   }, [isAuthenticated]);
 
-  // 냉장고 재료 ID 목록 만들기
-  const fridgeIngredientIds = mockFridge.map(
-    (ingredient) => ingredient.ing_id
-  );
+  // 검색 조건 변경 시 1페이지부터 다시 조회
+  useEffect(() => {
+    setPage(1);
+  }, [
+    filters.keyword,
+    filters.r_category_id,
+    filters.level,
+    filters.cooking_time,
+    filters.ingredients
+  ]);
 
-  // 냉장고 재료 일치율 계산
-  const calculateFridgeMatchRate = (recipe) => {
-    const recipeIngredients = recipe.ingredient_ids ?? [];
+  // 검색 조건은 백엔드에서 적용되므로 응답받은 목록을 그대로 사용
+  const filteredRecipes = recipes;
 
-    if (recipeIngredients.length === 0) {
-      return 0;
-    }
-
-    const matchedCount = recipeIngredients.filter((ingId) =>
-      fridgeIngredientIds.includes(ingId)
-    ).length;
-
-    return matchedCount / recipeIngredients.length;
-  };
-
-  // filter() : 배열에서 조건에 맞는 데이터만 골라서 새로운 배열을 만드는 함수
-  const filteredRecipes = mockRecipes.filter((recipe) => {
-    //레시피 제목에 검색어 포함 -> true
-    //앞 뒤 공백 제거해서 검색, 영어 대소문자 구분 없이 검색 가능
-    const matchKeyword = recipe.recipe_title.toLowerCase().includes(filters.keyword.trim().toLowerCase());
-    //난이도를 선택하지 않았거나, 선택한 난이도와 레시피 난이도가 같으면 true
-    const matchLevel = filters.level === null || recipe.level === filters.level;
-    //조리 시간을 선택하지 않았으면 전체 허용
-    //"초과" 선택 시 60분 초과, 그 외에는 선택한 시간 이하만 허용
-    const matchTime =
-    filters.cooking_time === null ||
-    (filters.cooking_time === "초과"
-      ? recipe.cooking_time > 60
-      : recipe.cooking_time <= Number(filters.cooking_time));
-    //요리 종류를 선택하지 않았거나, 선택한 카테고리 ID가 같으면 true
-    const matchCategory =
-      filters.r_category_id === null ||
-      recipe.r_category_id === filters.r_category_id; 
-
-    // 레시피에 필요한 전체 재료
-    const recipeIngredients = recipe.ingredient_ids ?? [];
-
-    // 선택한 재료 중 레시피에 포함된 재료 개수
-    const matchedCount = recipeIngredients.filter((ingId) =>
-      filters.ingredients.includes(ingId)
-    ).length;
-
-    // 재료 일치율 계산
-    const matchRate =
-      recipeIngredients.length > 0
-        ? matchedCount / recipeIngredients.length
-        : 0;
-
-    // 재료를 선택하지 않았으면 전체 표시
-    // 선택했다면 일치율 50% 이상만 표시
-    const matchIngredients =
-      filters.ingredients.length === 0 ||
-      (recipeIngredients.length > 0 && matchRate >= 0.5);
-
-    // 선택한 재료가 레시피에 모두 포함되어 있는지 확인
-      const matchSelectedIngredients =
-      filters.ingredients.every((ingId) =>
-        recipeIngredients.includes(ingId)
-    );
-
-    // ON일 때 선택 재료 포함 여부와 냉장고 일치율 50% 이상 확인
-    const matchFridge =
-      !isAllIngredientsOn ||
-      (
-        matchSelectedIngredients &&
-        calculateFridgeMatchRate(recipe) >= 0.5
-      );
-
-    //검색, 난이도, 조리시간, 요리 종류 선택 모두 만족해야 출력
-    return (matchKeyword && matchLevel && matchTime && matchCategory && (isAllIngredientsOn ? matchFridge : matchIngredients));
-  }); 
-
-    const recipesWithMatch = filteredRecipes.map((recipe) => {
-      // ON이면 냉장고 재료, OFF면 선택한 재료를 기준으로 계산
-      const selectedIngredientIds = isAllIngredientsOn
-        ? fridgeIngredientIds
-        : filters.ingredients;
-
-      // OFF 상태에서 선택한 재료가 없으면 기존 데이터 유지
-      if (!isAllIngredientsOn && filters.ingredients.length === 0) {
-        return recipe;
-      }
-
-    const recipeIngredients = recipe.ingredient_ids ?? [];
-
-    const matchedCount = recipeIngredients.filter((ingId) =>
-      selectedIngredientIds.includes(ingId)
-    ).length;
-
-    const matchRate =
-      recipeIngredients.length > 0
-        ? matchedCount / recipeIngredients.length
-        : 0;
-
-    // 선택하지 않은 재료 ID 찾기
-    const missingIds = recipeIngredients.filter(
-      (ingId) => !selectedIngredientIds.includes(ingId)
-    );
-
-    // ID를 재료 이름으로 변환
-    const missingIngredients = mockIngredients.filter((ingredient) =>
-      missingIds.includes(ingredient.ing_id)
-    );
-
-    return {
-      ...recipe,
-      match_rate: matchRate,
-      missing_ingredients: missingIngredients,
-    };
-  });  
-
-  // 재료가 하나 이상인지 확인하고, 재료가 선택되어있으면 정렬 기준을 일치율로 설정
-  const currentSort =
-  filters.ingredients.length > 0 ? "match_rate" : filters.sort;
+  // 정렬에 사용할 레시피 목록
+  const recipesWithMatch = filteredRecipes;
 
   // 정렬 기준에 따라 가나다순 또는 일치율순 정렬
   const sortedRecipes = [...recipesWithMatch].sort((a, b) => {
-    //일치율 높은 레시피부터 정렬(내림차순)
-    if (filters.sort === "match_rate") {
-      return b.match_rate - a.match_rate;
+    // 재료를 선택했거나 일치율순을 선택했다면
+    if (filters.ingredients.length > 0 || filters.sort === "match_rate") {
+      return (b.match_rate ?? 0) - (a.match_rate ?? 0);
     }
+
+    // 그 외에는 가나다순
     return a.recipe_title.localeCompare(b.recipe_title, "ko");
   });
 
@@ -230,7 +257,7 @@ function RecipeListPage() {
   };
 
   // 재료 이름과 대분류 조건에 맞는 식재료 목록
-  const filteredIngredients = mockIngredients.filter((ingredient) =>
+  const filteredIngredients = ingredients.filter((ingredient) =>
     ingredient.ing_name.includes(ingredientKeyword.trim()) &&
     (ingredientCategory === null ||
       ingredient.ing_category_id === ingredientCategory)
@@ -312,7 +339,7 @@ function RecipeListPage() {
             <h3 className="text-sm font-bold text-ink-soft">재료</h3>
             {filters.ingredients.length > 0 && (
               <div className="flex flex-wrap gap-1.5">
-                {mockIngredients
+                {ingredients
                   .filter((ingredient) => filters.ingredients.includes(ingredient.ing_id))
                   .map((ingredient) => (
                     <button
@@ -412,19 +439,13 @@ function RecipeListPage() {
               />
             </button>
             <span className={`font-bold ${isAllIngredientsOn ? "text-have" : "text-ink"}`}>내 냉장고 재료 우선</span>
-            {/* 켰을 때만 어떻게 거르는지 안내, 껐을 때는 로그인 전에만 안내 */}
+            {/* [병합] 켰을 때 안내. woojung 브랜치에서도 아직 검색 조건에 반영 전이라 '준비 중'으로 표시 */}
             {isAllIngredientsOn ? (
               <div className="basis-full flex flex-col gap-0.5 pl-16 text-sm text-have">
-                <p>
-                  내 냉장고 재료(<strong>{fridgeIngredientIds.length}개</strong>)로 <strong>50% 이상</strong> 만들 수 있는 요리만 보여요.
+                <p>내 냉장고 재료로 만들 수 있는 요리를 먼저 보여 주는 기능이에요.</p>
+                <p className="mt-1 self-start rounded-[8px] bg-surface px-2.5 py-1">
+                  지금은 준비 중이라 검색 결과에는 아직 반영되지 않아요.
                 </p>
-                <p>카드의 일치율 · 부족한 재료는 내 냉장고 기준이에요.</p>
-                {/* 필터 재료가 있을 때만, 맨 아래에 배경색으로 강조 */}
-                {filters.ingredients.length > 0 && (
-                  <p className="mt-1 self-start rounded-[8px] bg-surface px-2.5 py-1">
-                    필터에서 고른 재료 {filters.ingredients.length}개가 모두 들어간 요리 중에서 골랐어요.
-                  </p>
-                )}
               </div>
             ) : (
               !isAuthenticated && <span className="text-sm text-muted">로그인하면 켤 수 있어요</span>
@@ -434,7 +455,7 @@ function RecipeListPage() {
           {/* ④ 결과 개수 + 정렬 */}
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-lg font-black">
-              검색 결과 <span className="text-accent">{filteredRecipes.length}개</span>
+              검색 결과 <span className="text-accent">{filteredRecipes.length}개</span>{(page > 1 || hasNextPage) && <span className="ml-2 text-sm font-medium text-muted">(이 페이지)</span>}
             </p>
             <select
               aria-label="정렬"
@@ -452,19 +473,45 @@ function RecipeListPage() {
             </select>
           </div>
 
-          {filteredRecipes.length === 0 && (
+          {/* [병합] 불러오는 중 · 오류 (woojung 브랜치) */}
+          {loading && <p role="status" className="text-muted">레시피를 불러오는 중...</p>}
+          {error && <p role="alert" className="rounded-[16px] bg-miss-soft px-5 py-3 text-miss">{error}</p>}
+
+          {!loading && !error && filteredRecipes.length === 0 && (
             <p className="rounded-card bg-surface p-8 text-center text-muted shadow-card">검색 결과가 없습니다.</p>
           )}
 
           {/* ⑤ 결과 카드: 한 줄에 최대 3개 */}
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
-            {sortedRecipes.map((recipe)=>(
+            {/* [병합] 새 결과를 불러오는 동안에는 예전 카드를 숨김 */}
+            {!loading && sortedRecipes.map((recipe)=>(
               <RecipeCard
                key={recipe.recipe_id}
                recipe={recipe}
-               showMatch={true}
+               showMatch={filters.ingredients.length > 0}
               />
             ))}
+          </div>
+
+          {/* [병합] 페이지 이동 (woojung 브랜치, 한 페이지 20개) */}
+          <div className="flex items-center justify-center gap-3 pt-2">
+            <button
+              type="button"
+              className="h-10 rounded-pill bg-surface px-5 text-sm font-medium shadow-card hover:bg-gray-50 disabled:opacity-40"
+              disabled={page === 1 || loading}
+              onClick={() => setPage((prev) => prev - 1)}
+            >
+              ‹ 이전
+            </button>
+            <span className="text-sm font-bold">{page} 페이지</span>
+            <button
+              type="button"
+              className="h-10 rounded-pill bg-surface px-5 text-sm font-medium shadow-card hover:bg-gray-50 disabled:opacity-40"
+              disabled={loading || !hasNextPage}
+              onClick={() => setPage((prev) => prev + 1)}
+            >
+              다음 ›
+            </button>
           </div>
         </section>
       </div>
@@ -504,7 +551,7 @@ function RecipeListPage() {
                     }
                   >
                     <option value="">전체 재료</option>
-                    {mockIngredientCategories.map((category) => (
+                    {ingredientCategories.map((category) => (
                       <option
                         key={category.ing_category_id}
                         value={category.ing_category_id}
@@ -556,7 +603,7 @@ function RecipeListPage() {
                   <p className="text-sm text-muted">선택한 재료가 없습니다.</p>
                 )}
                 <div className="flex flex-wrap gap-2">
-                  {mockIngredients
+                  {ingredients
                     .filter((ingredient) => tempIngredients.includes(ingredient.ing_id))
                     .map((ingredient) => (
                       <button
