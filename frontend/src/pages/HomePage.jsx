@@ -2,6 +2,9 @@
 // 메인 화면 (와이어프레임 v6 5~6장 · 디자인 시안 F)
 // 로그인: 배너(내 냉장고 열기) → 내 냉장고 추천 → 인기 레시피 + 커뮤니티 새 글
 // 비로그인: 배너(로그인하고 시작하기) → 인기 레시피 → 새로 올라온 레시피 + 커뮤니티 새 글
+// [11/24 조현기] 내 냉장고 추천은 서버 계산이 3~4초 걸려서 따로 로딩: 그동안 회색 자리 카드 4장 + 배너 '찾는 중'
+//   (나머지 섹션은 먼저 뜨고, 추천이 오면 같은 자리에 카드만 바뀜 → 화면이 밀리지 않음)
+// [11/24 조현기] 추천 '더보기' · 주황 배너 카드 → 추천 전체 화면(/recipes/recommend, 권우정)으로 연결
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
@@ -28,6 +31,21 @@ function SectionTitle({ title, moreTo }) {
   );
 }
 
+// 추천을 기다리는 동안 보여 줄 회색 자리 카드 (RecipeCard와 같은 크기)
+function RecipeCardSkeleton() {
+  return (
+    <div className="overflow-hidden rounded-card bg-surface shadow-card animate-pulse" aria-hidden="true">
+      <div className="aspect-[4/3] w-full bg-photo" />
+      <div className="flex flex-col gap-3 p-5">
+        <div className="h-5 w-3/4 rounded-pill bg-gray-100" />
+        <div className="h-4 w-1/2 rounded-pill bg-gray-100" />
+        <div className="h-2 w-full rounded-pill bg-gray-100" />
+        <div className="h-6 w-1/3 rounded-pill bg-gray-100" />
+      </div>
+    </div>
+  );
+}
+
 // 레시피 카드 목록 (카드는 권우정 RecipeCard, 여기서는 칸만 나눔)
 // columns: 넓은 화면에서 한 줄에 몇 개 놓을지 (3 또는 4)
 function RecipeCardList({ recipes, showMatch = false, emptyText, columns = 4 }) {
@@ -50,6 +68,7 @@ function HomePage() {
   const [recommendRecipes, setRecommendRecipes] = useState([]);
   const [recommendTotal, setRecommendTotal] = useState(0); // 배너에 보여 줄 전체 개수
   const [recommendError, setRecommendError] = useState("");
+  const [isRecommendLoading, setIsRecommendLoading] = useState(true); // 추천 계산 기다리는 중
 
   // 인기 레시피 GET /recipes?sort=popular · 새 레시피 ?sort=latest · 커뮤니티 새 글 GET /posts?sort=latest
   // ※ /recipes의 sort(인기순 · 최신순)는 권우정 백엔드에 추가가 필요함. 추가 전에는 서버가 무시해서 가나다순으로 옴
@@ -86,6 +105,9 @@ function HomePage() {
       })
       .catch((err) => {
         if (err.code !== "ERR_CANCELED") setRecommendError("추천 레시피를 불러오지 못했습니다.");
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setIsRecommendLoading(false);
       });
     return () => controller.abort();
   }, [isAuthenticated]);
@@ -118,13 +140,19 @@ function HomePage() {
 
         {/* 로그인: 지금 만들 수 있는 요리 개수 / 비로그인: 서비스 소개 */}
         <Link
-          to={isAuthenticated ? "/fridge" : "/signup"}
+          to={isAuthenticated ? "/recipes/recommend" : "/signup"}
           className="flex flex-col justify-between gap-6 rounded-[32px] bg-accent p-7 text-white shadow-card hover:bg-accent-dark"
         >
           <span className="text-sm font-medium opacity-90">
             {isAuthenticated ? "내 냉장고" : "처음 오셨나요?"}
           </span>
-          {isAuthenticated && recommendTotal > 0 ? (
+          {isAuthenticated && isRecommendLoading ? (
+            <p className="text-2xl font-black leading-snug">
+              지금 만들 수 있는
+              <br />
+              요리를 찾는 중...
+            </p>
+          ) : isAuthenticated && recommendTotal > 0 ? (
             <p className="text-2xl font-black leading-snug">
               <span className="text-5xl">{recommendTotal}</span>가지
               <br />
@@ -144,8 +172,12 @@ function HomePage() {
       {/* ④ 내 냉장고 추천: 로그인한 사용자에게만 */}
       {isAuthenticated && (
         <section>
-          <SectionTitle title="내 냉장고 재료로 만들 수 있는 요리" moreTo="/fridge" />
-          {recommendError ? (
+          <SectionTitle title="내 냉장고 재료로 만들 수 있는 요리" moreTo="/recipes/recommend" />
+          {isRecommendLoading ? (
+            <div role="status" aria-label="추천 레시피를 불러오는 중" className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+              {Array.from({ length: RECOMMEND_COUNT }, (_, i) => <RecipeCardSkeleton key={i} />)}
+            </div>
+          ) : recommendError ? (
             <p role="alert" className="rounded-card bg-miss-soft p-6 text-miss">{recommendError}</p>
           ) : (
             <RecipeCardList
