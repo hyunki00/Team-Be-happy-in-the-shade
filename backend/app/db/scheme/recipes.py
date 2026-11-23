@@ -60,6 +60,9 @@ class RecipeListItem(BaseModel):
     missing_ingredients: list[MissingIngredient] = Field(default_factory=list)
     ingredient_ids: list[int] = Field(default_factory=list)
 
+    # 사용자의 레시피에 필요한 도구 보유 여부
+    can_cook_with_my_tools: bool = False # False : 도구가 없거나, 로그인하지 않았거나, 필요한 도구 정보가 없음
+
 
 # 레시피 상세의 식재료 하나
 class RecipeIngredientItem(BaseModel):
@@ -102,3 +105,6 @@ class RecipeSearch(BaseModel):
 
     # 조리 시간이 60분을 초과하는 레시피만 검색할지 여부
     over_60: bool = False
+
+    # 내 냉장고 재료를 기준으로 레시피를 검색할지 여부
+    fridge_first: bool = False
