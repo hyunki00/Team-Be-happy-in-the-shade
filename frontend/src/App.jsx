@@ -23,13 +23,16 @@ import ResetPasswordPage from "./pages/ResetPasswordPage";// 효정: resetpasswo
 
 // 1. 공통 레이아웃
 // AuthProvider 안에서 useNavigate를 쓰기 때문에 라우터 안쪽(여기)에서 감싼다. (mini와 같음)
+// 바탕색 · 글꼴은 index.css, 여기서는 전체 폭(최대 1152px)과 좌우 여백만 정한다
 const RootLayout = () => {
   return (
     <AuthProvider>
-      <NavBar />
-      <main>
-        <Outlet /> {/* 페이지 내용이 바뀔 자리 */}
-      </main>
+      <div className="min-h-screen bg-page text-ink">
+        <NavBar />
+        <main className="mx-auto max-w-6xl px-4 pb-16 md:px-6">
+          <Outlet /> {/* 페이지 내용이 바뀔 자리 */}
+        </main>
+      </div>
     </AuthProvider>
   );
 };

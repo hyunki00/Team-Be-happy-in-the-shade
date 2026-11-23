@@ -1,1 +1,155 @@
+/* 담당: 조현기 */
+/* 전체 디자인 (시안 F · 따뜻한 카드): 색 · 글꼴 · 기본 모양을 여기서만 정한다 */
+@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap");
 @import "tailwindcss";
+
+/* 1. 색 · 글꼴 · 둥글기 · 그림자 이름
+   쓰는 법: bg-page, bg-surface, text-ink, text-muted, bg-accent, text-have, bg-miss-soft,
+           rounded-card, shadow-card 처럼 Tailwind 클래스로 쓴다 */
+@theme {
+  --font-sans: "Noto Sans KR", system-ui, -apple-system, "Malgun Gothic", sans-serif;
+
+  --color-page: #F7F4EF;        /* 화면 바탕 (크림) */
+  --color-surface: #FFFFFF;     /* 카드 바탕 */
+  --color-photo: #E9DCCB;       /* 사진이 없을 때 자리 색 */
+  --color-line: #ECE7DF;        /* 구분선 */
+  --color-ink: #222222;         /* 기본 글자 */
+  --color-ink-soft: #4A4A4A;    /* 보조 글자 */
+  --color-muted: #6B6B6B;       /* 흐린 글자 (날짜 · 안내) */
+
+  --color-accent: #BF4F24;      /* 포인트 (주요 버튼 · 선택된 메뉴) */
+  --color-accent-dark: #A3411C; /* 포인트 버튼에 마우스 올렸을 때 */
+  --color-accent-soft: #F5EDE6; /* 포인트 연한 바탕 */
+
+  --color-have: #2F6B4F;        /* 있는 재료 · 일치율 */
+  --color-have-soft: #E3F0E8;
+  --color-miss: #A8401B;        /* 부족한 재료 · 유통기한 임박 */
+  --color-miss-soft: #FBEDE6;
+
+  /* Tailwind 기본 회색(gray-50~950)을 따뜻한 회색으로 바꿈
+     → 이미 gray 클래스를 쓴 화면도 파일을 안 고치고 같은 분위기가 됨 */
+  --color-gray-50: #FAF8F5;
+  --color-gray-100: #F5F3EF;
+  --color-gray-200: #ECE7DF;
+  --color-gray-300: #DDD6CB;
+  --color-gray-400: #8F877C;
+  --color-gray-500: #6B6B6B;
+  --color-gray-600: #5A5550;
+  --color-gray-700: #4A4A4A;
+  --color-gray-800: #333333;
+  --color-gray-900: #222222;
+  --color-gray-950: #1A1A1A;
+
+  --radius-card: 28px;          /* rounded-card: 카드 */
+  --radius-pill: 999px;         /* rounded-pill: 알약 모양 버튼 · 칩 */
+
+  --shadow-card: 0 8px 24px rgba(90, 70, 40, 0.08);  /* shadow-card */
+  --shadow-float: 0 6px 20px rgba(90, 70, 40, 0.08); /* shadow-float: 메뉴바 */
+}
+
+/* 2. 기본 모양 (클래스를 안 붙인 태그에도 적용, 클래스를 붙이면 클래스가 이김) */
+@layer base {
+  /* 선 색 기본값: Tailwind v4는 색을 안 쓴 border의 색이 글자색(진한 검정)이라
+     border · border-b · divide-y만 쓴 곳에 굵고 진한 선이 생김 → 연한 선 색으로 바꿈 */
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-line);
+  }
+
+  body {
+    background-color: var(--color-page);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1 {
+    font-size: 1.75rem;
+    font-weight: 900;
+    letter-spacing: -0.02em;
+  }
+  h2 {
+    font-size: 1.25rem;
+    font-weight: 700;
+  }
+  h3 {
+    font-size: 1.0625rem;
+    font-weight: 700;
+  }
+
+  button:not(:disabled),
+  [role="button"] {
+    cursor: pointer;
+  }
+
+  /* 입력칸: 테두리가 안 보이던 칸도 보이게 */
+  input:not([type="checkbox"], [type="radio"], [type="file"], [type="range"]),
+  select,
+  textarea {
+    border: 1px solid var(--color-gray-300);
+    border-radius: 12px;
+    background-color: var(--color-surface);
+    padding: 0.5rem 0.75rem;
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--color-gray-400);
+  }
+
+  input[type="checkbox"],
+  input[type="radio"] {
+    accent-color: var(--color-accent);
+  }
+
+  /* 키보드로 이동할 때 지금 위치가 보이게 */
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+}
+
+/* 3. 알림창(SweetAlert2) 모양을 시안 F에 맞춤
+   SweetAlert는 자기 CSS를 나중에 넣기 때문에 클래스를 두 번 써서 이쪽이 이기게 했다 */
+.swal2-popup.swal2-popup {
+  border-radius: var(--radius-card);
+  padding: 2rem 1.5rem 1.5rem;
+  font-family: var(--font-sans);
+  color: var(--color-ink);
+  box-shadow: var(--shadow-card);
+}
+.swal2-popup .swal2-title.swal2-title {
+  font-size: 1.25rem;
+  font-weight: 900;
+  color: var(--color-ink);
+}
+.swal2-popup .swal2-html-container.swal2-html-container {
+  color: var(--color-ink-soft);
+  font-size: 1rem;
+}
+.swal2-popup .swal2-styled.swal2-styled {
+  height: 2.75rem;
+  padding: 0 1.5rem;
+  border-radius: var(--radius-pill);
+  font-weight: 700;
+  font-size: 0.9375rem;
+  box-shadow: none;
+}
+.swal2-popup .swal2-confirm.swal2-confirm {
+  background-color: var(--color-accent);
+}
+.swal2-popup .swal2-confirm.swal2-confirm:hover {
+  background-color: var(--color-accent-dark);
+  background-image: none;
+}
+.swal2-popup .swal2-cancel.swal2-cancel,
+.swal2-popup .swal2-deny.swal2-deny {
+  background-color: var(--color-gray-100);
+  color: var(--color-ink);
+}
+.swal2-popup .swal2-styled.swal2-styled:focus-visible {
+  box-shadow: 0 0 0 3px var(--color-accent-soft);
+}

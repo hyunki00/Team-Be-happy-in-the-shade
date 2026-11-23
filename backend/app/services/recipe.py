@@ -2,7 +2,8 @@
 # 할 일: class RecipeService
 #   search / get_detail / toggle_like / toggle_bookmark   (비로그인이면 user_id가 None)
 #   calc_match_rate(recipe_ing_ids, my_ing_ids)  내 냉장고에 있는 재료 수 ÷ 레시피 재료 수
-#   recommend(db, user_id)  settings.match_rate(.env의 MATCH_RATE, 기본 0.7) 이상만
+#   recommend(db, user_id)  settings.match_rate(.env의 MATCH_RATE, 기본 0.5) 이상만
+# [병합 11/23 조현기] 재료 검색 일치율 기준을 0.7 고정 → settings.match_rate(0.5)로 (추천 · 검색 기준을 하나로)
 #   ※ recommend는 정호진의 /fridge/recommendations가 부름
 #   ※ 재료를 고르면 일치율순, 안 고르면 가나다순
 #
@@ -126,8 +127,12 @@ class RecipeService:
         user_id: int | None = None,
         limit: int = 20,
         offset: int = 0,
-        min_match_rate: float = 0.7
+        min_match_rate: float | None = None
     ) -> list[RecipeListItem]:
+
+        # [병합 11/23] 기준을 따로 안 주면 .env의 MATCH_RATE(기본 0.5)를 씀
+        if min_match_rate is None:
+            min_match_rate = settings.match_rate
 
         # 1. 검색 조건에 맞는 레시피 조회
         # 1-1. 재료 일치율 정렬이 필요하면 전체 후보를 조회
@@ -227,7 +232,7 @@ class RecipeService:
                 reverse=True
             )
 
-            # 4-2. 일치율 70% 이상인 레시피만 선택
+            # 4-2. 일치율 기준(MATCH_RATE, 50%) 이상인 레시피만 선택
             results = [
                 recipe
                 for recipe in results

@@ -1,4 +1,6 @@
 // 담당: 오효정 (임시화면입니다~)
+// [디자인 11/22 조현기] 시안 F 적용 — 모양만 바꿈, 작성자 확인 로직은 그대로
+//   1. 로그인 · 없음 · 본인 아님 · 데이터 없음 안내 문구를 가운데 흰 카드로 (폼 모양은 RecipeForm에서)
 import { useParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { mockRecipes, mockRecipeDetail } from '../mockData';
@@ -39,20 +41,20 @@ function RecipeEditPage() {
   // 로그인·작성자 확인 및 화면 출력
   // API 연결 후 서버에서도 작성자 권한을 확인해야 함
   if (!isAuthenticated || !user) {
-    return <p>로그인 후 레시피를 수정할 수 있습니다.</p>;
+    return <p className="mx-auto mt-8 max-w-lg rounded-card bg-surface p-10 text-center text-muted shadow-card">로그인 후 레시피를 수정할 수 있습니다.</p>;
   }
 
   if (!recipe) {
-    return <p>레시피를 찾을 수 없습니다.</p>;
+    return <p className="mx-auto mt-8 max-w-lg rounded-card bg-surface p-10 text-center text-muted shadow-card">레시피를 찾을 수 없습니다.</p>;
   }
 
   if (Number(recipe.user_id) !== Number(user.user_id)) {
-    return <p>본인이 작성한 레시피만 수정할 수 있습니다.</p>;
+    return <p className="mx-auto mt-8 max-w-lg rounded-card bg-surface p-10 text-center text-muted shadow-card">본인이 작성한 레시피만 수정할 수 있습니다.</p>;
   }
 
   // 상세 정보 없이 빈 수정 폼이 열리지 않도록 안내
   if (!detail) {
-    return <p>이 레시피의 상세 테스트 데이터가 없습니다. DB 연결 후 상세 정보를 불러올 예정입니다.</p>;
+    return <p className="mx-auto mt-8 max-w-lg rounded-card bg-surface p-10 text-center text-muted shadow-card">이 레시피의 상세 테스트 데이터가 없습니다. DB 연결 후 상세 정보를 불러올 예정입니다.</p>;
   }
 
   return (

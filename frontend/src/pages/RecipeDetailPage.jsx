@@ -1,11 +1,16 @@
 // 담당: 권우정
+// [병합 11/23 조현기] woojung 브랜치(DB 연결 · 주석 정리) + main 디자인(11/22) 합침
+//   - 상세 조회 · 좋아요 · 북마크 로직은 woojung 브랜치 그대로 (mockData → 실제 DB)
+//   - 화면 모양은 main 디자인 그대로 (큰 사진 → 제목 카드 → 재료 → 조리 순서 → 댓글)
+//   - 서버 요청을 직접 주소(127.0.0.1) 대신 api.js로: 프로젝트 규칙(요청은 api.js 하나로)
+//     + 127.0.0.1로 보내면 localhost에서 받은 로그인 쿠키가 같이 안 가서 좋아요 · 북마크가 401(로그인 필요)로 실패하던 문제
+//   - 재료 칩: 상세 API는 내 냉장고 기준 부족 재료를 주지 않아서 '보유 / 부족' 표시는 뺌 (이름 + 분량만)
+// [디자인 11/22 조현기] 시안 F: 가운데 한 줄(최대 760px), 4칸 정보, 둥근 좋아요 · 북마크 버튼, 번호 동그라미 조리 순서
 import { useParams } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import CommentSection from "../components/CommentSection";
-
-// 백엔드 FastAPI 서버 주소
-const API_URL = "http://127.0.0.1:8044";
+import api from "../api"; // [병합] 공통 api
 
 function RecipeDetailPage() {
 
@@ -43,24 +48,10 @@ function RecipeDetailPage() {
       setRecipe(null);
 
       try {
-        const response = await fetch(
-          `${API_URL}/recipes/${recipeId}`,
-          {
-            credentials: "include",
-            signal: controller.signal
-          }
-        );
-
-        if (response.status === 404) {
-          throw new Error("레시피를 찾을 수 없습니다.");
-        }
-
-        if (!response.ok) {
-          throw new Error("레시피 조회에 실패했습니다.");
-        }
-
-         // 서버 응답을 JSON으로 변환
-        const data = await response.json();
+        // [병합] api.js로 요청 (로그인 쿠키 같이 감)
+        const { data } = await api.get(`/recipes/${recipeId}`, {
+          signal: controller.signal,
+        });
 
         setRecipe(data);
         setIsLiked(data.is_liked);
@@ -68,9 +59,13 @@ function RecipeDetailPage() {
         setIsBookmarked(data.is_bookmarked);
 
       } catch (err) {
-        if (err.name !== "AbortError") {
-          setError(err.message);
-        }
+        // [병합] axios: 취소는 ERR_CANCELED, 서버 응답 코드는 err.response.status
+        if (err.code === "ERR_CANCELED") return;
+        setError(
+          err.response?.status === 404
+            ? "레시피를 찾을 수 없습니다."
+            : "레시피 조회에 실패했습니다."
+        );
       } finally {
         if (!controller.signal.aborted) {
           setLoading(false);
@@ -97,34 +92,18 @@ function RecipeDetailPage() {
 
     try {
       // 현재 좋아요 상태에 따라 추가(POST) 또는 취소(DELETE) 요청
-      const method = isLiked ? "DELETE" : "POST";
-
-      const response = await fetch(
-        `${API_URL}/recipes/${recipeId}/likes`,
-        {
-          method,
-          credentials: "include"
-        }
-      );
-
-      if (response.status === 401) {
-        throw new Error("서버 로그인이 필요합니다.");
-      }
-
-      if (!response.ok) {
-        throw new Error("좋아요 처리에 실패했습니다.");
-      }
+      const { data } = isLiked
+        ? await api.delete(`/recipes/${recipeId}/likes`)
+        : await api.post(`/recipes/${recipeId}/likes`);
 
       // 서버에서 반환한 좋아요 상태로 화면 갱신
-      const data = await response.json();
-
       setIsLiked(data.is_liked);
       setLikeCount((prev) =>
         prev + (data.is_liked ? 1 : -1)
       );
 
     } catch (err) {
-      alert(err.message);
+      alert(err.response?.status === 401 ? "서버 로그인이 필요합니다." : "좋아요 처리에 실패했습니다.");
     } finally {
       setIsSaving(false);
     }
@@ -143,145 +122,163 @@ function RecipeDetailPage() {
 
     try {
       // 현재 북마크 상태에 따라 추가(POST) 또는 취소(DELETE) 요청
-      const method = isBookmarked ? "DELETE" : "POST";
-
-      const response = await fetch(
-        `${API_URL}/recipes/${recipeId}/bookmarks`,
-        {
-          method,
-          credentials: "include"
-        }
-      );
-
-      if (response.status === 401) {
-        throw new Error("서버 로그인이 필요합니다.");
-      }
-
-      if (!response.ok) {
-        throw new Error("북마크 처리에 실패했습니다.");
-      }
+      const { data } = isBookmarked
+        ? await api.delete(`/recipes/${recipeId}/bookmarks`)
+        : await api.post(`/recipes/${recipeId}/bookmarks`);
 
       // 서버에서 반환한 북마크 상태로 화면 갱신
-      const data = await response.json();
       setIsBookmarked(data.is_bookmarked);
 
     } catch (err) {
-      alert(err.message);
+      alert(err.response?.status === 401 ? "서버 로그인이 필요합니다." : "북마크 처리에 실패했습니다.");
     } finally {
       setIsSaving(false);
     }
   };
 
+  // 카드 · 둥근 버튼 모양 (디자인)
+  const cardClass = "rounded-card bg-surface p-6 shadow-card md:p-8";
+  const noticeClass = "mx-auto mt-8 max-w-lg rounded-card bg-surface p-10 text-center text-muted shadow-card";
+  const pillClass = (isOn) =>
+    `inline-flex items-center h-12 px-5 rounded-pill text-[15px] font-bold disabled:opacity-40 ${
+      isOn ? "bg-ink text-white" : "bg-gray-100 text-ink hover:bg-gray-200"
+    }`;
+
   // 로딩 / 오류
   if (loading) {
-    return <p>레시피를 불러오는 중...</p>;
+    return <p role="status" className={noticeClass}>레시피를 불러오는 중...</p>;
   }
 
   if (error) {
-    return <p>{error}</p>;
+    return <p role="alert" className={noticeClass}>{error}</p>;
   }
 
   if (!recipe) {
-    return <p>레시피를 찾을 수 없습니다.</p>;
+    return <p className={noticeClass}>레시피를 찾을 수 없습니다.</p>;
   }
 
+  // 부족 재료 ID (서버가 줄 때만 표시)
+  const missingIds = (recipe.missing_ingredients ?? []).map((item) => item.ing_id);
+
   return (
-    <div>
-      <h1>레시피 상세 페이지</h1>
-      <p>레시피 번호 : {recipeId}</p>
+    <div className="mx-auto flex max-w-[760px] flex-col gap-8">
+      <h1 className="sr-only">레시피 상세 페이지</h1>
 
-      <h2>{recipe.recipe_title}</h2>
-      <p>{recipe.intro}</p>
-
-      {/* 레시피 이미지가 있을 때만 표시 */}
-      {recipe.image_url && (
+      {/* 레시피 이미지가 있을 때만 사진, 없으면 빈 자리 (16:10) */}
+      {recipe.image_url ? (
         <img
           src={recipe.image_url}
           alt={recipe.recipe_title}
-          width="300"
+          className="aspect-[16/10] w-full rounded-[32px] object-cover bg-photo shadow-card"
         />
+      ) : (
+        <div className="aspect-[16/10] w-full rounded-[32px] bg-photo" aria-hidden="true" />
       )}
 
-      <p>조리 시간 : {recipe.cooking_time}분</p>
-      <p>난이도 : {recipe.level}</p>
-      <p>작성자 : {recipe.nickname}</p>
-      <p>인분 : {recipe.servings}인분</p>
-      <p>요리 종류 : {recipe.category_name}</p>
-      <p>필요한 조리도구 : {recipe.tool_name ?? "없음"}</p>
-
-      {/* 로그인한 사용자 본인의 레시피인 경우 수정/삭제 버튼 표시 */}
-      {isAuthenticated && recipe.is_mine && (
-        <div>
-          <button type="button" disabled>수정</button>
-          <button type="button" disabled>삭제</button>
+      {/* 제목 카드: 사진 위로 살짝 겹침 */}
+      <section className={`${cardClass} relative -mt-16 mx-2 md:mx-4`}>
+        <div className="flex items-center justify-between gap-3">
+          <span className="rounded-pill bg-gray-100 px-3 py-1 text-sm font-bold text-ink-soft">
+            {recipe.category_name}
+          </span>
+          {/* 로그인한 사용자 본인의 레시피인 경우 수정/삭제 버튼 표시 */}
+          {isAuthenticated && recipe.is_mine && (
+            <div className="flex gap-1 text-sm text-ink-soft">
+              <button type="button" className="px-3 py-2 disabled:opacity-40" disabled>수정</button>
+              <button type="button" className="px-3 py-2 disabled:opacity-40" disabled>삭제</button>
+            </div>
+          )}
         </div>
-      )}
+        <h2 className="mt-3 text-3xl font-black tracking-tight md:text-4xl">{recipe.recipe_title}</h2>
+        {recipe.intro && <p className="mt-3 text-ink-soft leading-relaxed">{recipe.intro}</p>}
+        <p className="mt-2 text-sm text-muted">작성자 {recipe.nickname}</p>
 
-      <button
-        type="button"
-        onClick={handleLike}
-        disabled={isSaving}
-      >
-        {isLiked ? "좋아요 취소" : "좋아요"}
-      </button>
+        <dl className="mt-6 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <div className="rounded-[18px] bg-page py-3 text-center">
+            <dt className="text-sm text-muted">인분</dt>
+            <dd className="mt-1 font-bold">{recipe.servings}인분</dd>
+          </div>
+          <div className="rounded-[18px] bg-page py-3 text-center">
+            <dt className="text-sm text-muted">조리 시간</dt>
+            <dd className="mt-1 font-bold">{recipe.cooking_time}분</dd>
+          </div>
+          <div className="rounded-[18px] bg-page py-3 text-center">
+            <dt className="text-sm text-muted">난이도</dt>
+            <dd className="mt-1 font-bold">{recipe.level}</dd>
+          </div>
+          <div className="rounded-[18px] bg-page py-3 text-center">
+            <dt className="text-sm text-muted">필요한 조리도구</dt>
+            <dd className="mt-1 font-bold">{recipe.tool_name ?? "없음"}</dd>
+          </div>
+        </dl>
 
-      <p>좋아요 : {likeCount}개</p>
-      <p>댓글 : {recipe.comment_count}개</p>
-      <p>
-        좋아요 상태 : {isLiked ? "좋아요 누름" : "좋아요 안 누름"}
-      </p>
+        {/* 좋아요 · 북마크: 누른 상태는 검정 버튼 */}
+        <div className="mt-6 flex flex-wrap items-center gap-2">
+          <button type="button" aria-pressed={isLiked} className={pillClass(isLiked)} onClick={handleLike} disabled={isSaving}>
+            {isLiked ? "좋아요 취소" : "좋아요"}
+          </button>
+          <button type="button" aria-pressed={isBookmarked} className={pillClass(isBookmarked)} onClick={handleBookmark} disabled={isSaving}>
+            {isBookmarked ? "북마크 취소" : "북마크"}
+          </button>
+          <p className="ml-1 text-sm text-muted">
+            좋아요 {likeCount}개 · 댓글 {recipe.comment_count}개
+          </p>
+        </div>
+      </section>
 
-      <button
-        type="button"
-        onClick={handleBookmark}
-        disabled={isSaving}
-      >
-        {isBookmarked ? "북마크 취소" : "북마크"}
-      </button>
+      {/* 레시피에 필요한 식재료 이름과 수량 */}
+      <section className={cardClass}>
+        <h3 className="text-xl font-black">필요한 재료</h3>
+        <ul className="mt-4 flex flex-wrap gap-2">
+          {recipe.ingredients.map((ingredient) => {
+            const isMissing = missingIds.includes(ingredient.ing_id);
+            return (
+              <li
+                key={ingredient.ing_id}
+                className={`inline-flex items-center gap-2 h-11 px-4 rounded-pill ${
+                  isMissing ? "bg-miss-soft" : "bg-gray-100"
+                }`}
+              >
+                <span className="font-bold">{ingredient.ing_name}</span>
+                <span className="text-sm text-ink-soft">{ingredient.amount_text}</span>
+                {isMissing && <span className="text-xs font-bold text-miss">부족</span>}
+              </li>
+            );
+          })}
+        </ul>
+      </section>
 
-      <p>
-        북마크 상태 :
-        {isBookmarked ? " 북마크 저장됨" : " 북마크 안 됨"}
-      </p>
-
-      <h3>필요한 재료</h3>
-
-      {/* 레시피에 필요한 식재료 이름과 수량 출력 */}
-      <ul>
-        {recipe.ingredients.map((ingredient) => (
-          <li key={ingredient.ing_id}>
-            {ingredient.ing_name} : {ingredient.amount_text}
-          </li>
-        ))}
-      </ul>
-
-      <h3>조리 순서</h3>
-
-      {/* 조리 단계와 단계별 이미지 출력 */}
-      <ol style={{ listStyleType: "decimal", paddingLeft: "30px" }}>
-        {recipe.steps.map((step) => (
-          <li key={step.step_id}>
-            {step.step_content}
-
-            {step.step_image_url && (
-              <div>
-                <img
-                  src={step.step_image_url}
-                  alt={`${step.step_no}번 조리 단계`}
-                  width="200"
-                />
+      {/* 조리 단계와 단계별 이미지 */}
+      <section className={cardClass}>
+        <h3 className="text-xl font-black">조리 순서</h3>
+        <ol className="mt-5 flex flex-col gap-6">
+          {recipe.steps.map((step, index) => (
+            <li key={step.step_id} className="flex gap-4">
+              <span className="flex h-10 w-10 flex-none items-center justify-center rounded-full bg-accent font-bold text-white">
+                {index + 1}
+              </span>
+              <div className="flex min-w-0 flex-1 flex-col gap-3 pt-1.5">
+                <p className="text-[17px] leading-relaxed">{step.step_content}</p>
+                {step.step_image_url && (
+                  <img
+                    src={step.step_image_url}
+                    alt={`${step.step_no}번 조리 단계`}
+                    className="aspect-video w-full max-w-md rounded-[20px] object-cover bg-photo"
+                  />
+                )}
               </div>
-            )}
-          </li>
-        ))}
-      </ol>
+            </li>
+          ))}
+        </ol>
+      </section>
 
-      <h3>댓글</h3>
       {/* 현재 레시피 ID를 댓글 컴포넌트에 전달 */}
-      <CommentSection
-        targetType="recipe"
-        targetId={recipeId}
-      />
+      <section className={cardClass}>
+        <h3 className="text-xl font-black">댓글</h3>
+        <div className="mt-4">
+          <CommentSection targetType="recipe" targetId={recipeId} />
+        </div>
+      </section>
     </div>
   );
 }

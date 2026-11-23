@@ -1,15 +1,19 @@
-// 담당: 조현기
-// 로그인이 필요한 페이지를 감싸는 컴포넌트
-// 백엔드 로그인이 붙기 전까지는 각자 화면을 볼 수 있게 그냥 통과시킨다.
-// import { Navigate } from "react-router-dom";
-// import { useAuth } from "../contexts/AuthContext";
+// 담당: 조현기 — 쿠키 로그인 확인 후 보호 페이지를 표시합니다.
+import { Navigate, useLocation } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
 
 function ProtectedRoute({ children }) {
-  // TODO 백엔드 로그인 연결 후 아래 주석을 풀기
-  // const { isAuthenticated } = useAuth();
-  // if (!isAuthenticated) {
-  //   return <Navigate to="/login" replace />;
-  // }
+  const { isAuthenticated, isAuthLoading } = useAuth();
+  const location = useLocation();
+  // 로그인 확인 중: 가운데 흰 카드 (시안 F)
+  if (isAuthLoading) {
+    return (
+      <p role="status" className="mx-auto mt-8 max-w-sm rounded-card bg-surface p-8 text-center text-muted shadow-card">
+        로그인 확인 중...
+      </p>
+    );
+  }
+  if (!isAuthenticated) return <Navigate to="/login" state={{ from: location.pathname }} replace />;
   return children;
 }
 

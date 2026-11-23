@@ -17,12 +17,34 @@
 - 파일은 **폴더 없이 `.jsx` 한 개**로 만든다. `Components/X/index.jsx`처럼 폴더 + `index.jsx` 구조로 만들지 않는다.
 - 아래 ‘폴더 구조’에 없는 파일 · 폴더는 만들지 말고 먼저 물어본다.
 - 초보 팀이 읽을 코드다. 짧고 쉬운 코드, 한국어 주석을 짧게 단다.
-- 스타일(색 · 간격)은 나중에 정한다. 지금은 Tailwind 기본 클래스로 최소한만.
+- 스타일은 아래 ‘디자인 (시안 F)’의 색 이름을 쓴다. `#BF4F24` 같은 색 코드나 `orange-600` 같은 기본 색을 새로 쓰지 않는다.
 - 자기 담당 파일만 고친다. 다른 사람 파일이 필요하면 메신저로 요청한다.
 - `.env`, `node_modules`, `venv`, `__pycache__`는 커밋하지 않는다.
 - `git push --force` 금지. main 브랜치는 팀장(조현기)만 다룬다. 각자 자기 브랜치(hyunki, woojung, hojin, hyojeong, yubin)에서 작업한다.
 - 커밋 메시지에는 어떤 파일의 어느 부분을 고쳤는지 적는다. 예: `feat: FridgePage 재료 카드 목록 추가`
 - 커밋 · push는 내가 요청할 때만 한다.
+
+## 디자인 (시안 F · 따뜻한 카드)
+
+색 · 글꼴 · 기본 모양은 `src/index.css` 한 곳에서만 정한다 (담당: 조현기). 각자 화면에서는 아래 이름을 Tailwind 클래스로 쓴다.
+
+| 이름 | 색 | 쓰는 곳 | 예시 클래스 |
+|---|---|---|---|
+| page | #F7F4EF | 화면 바탕 (이미 깔려 있음) | `bg-page` |
+| surface | #FFFFFF | 카드 바탕 | `bg-surface` |
+| photo | #E9DCCB | 사진이 없을 때 자리 | `bg-photo` |
+| line | #ECE7DF | 구분선 | `border-line`, `divide-line` |
+| ink · ink-soft · muted | #222 · #4A4A4A · #6B6B6B | 기본 글자 · 보조 글자 · 흐린 글자 | `text-ink`, `text-muted` |
+| accent · accent-dark · accent-soft | #BF4F24 · #A3411C · #F5EDE6 | 주요 버튼 · 선택된 메뉴 | `bg-accent text-white hover:bg-accent-dark` |
+| have · have-soft | #2F6B4F · #E3F0E8 | 있는 재료 · 일치율 | `bg-have-soft text-have` |
+| miss · miss-soft | #A8401B · #FBEDE6 | 부족한 재료 · 유통기한 임박 · 오류 | `bg-miss-soft text-miss` |
+
+- 카드: `rounded-card bg-surface shadow-card p-6` (흰 바탕 · 둥글기 28px · 옅은 그림자)
+- 버튼 · 칩: `rounded-pill h-11 px-5` (주요 버튼은 accent, 보조 버튼은 `bg-gray-100`)
+- `gray-50`~`gray-950`은 따뜻한 회색으로 바뀌어 있으니 회색은 그대로 써도 된다.
+- 글꼴은 Noto Sans KR. 제목 굵기는 `font-black`(900) 또는 `font-bold`.
+- 화면 폭 · 좌우 여백은 `App.jsx`의 RootLayout이 정한다 (최대 1152px). 페이지에서 `max-w-6xl` 이하로 쓰면 된다.
+- 시안 화면: 디자인 시안 캔버스의 ‘시안 F’ (메인 · 내 냉장고 · 레시피 상세)
 
 ## 폴더 구조
 
@@ -38,7 +60,6 @@ frontend/src/
 ├── components/              여러 페이지가 같이 쓰는 컴포넌트
 │   ├── NavBar.jsx
 │   ├── ProtectedRoute.jsx
-│   ├── SearchFilter.jsx
 │   ├── RecipeCard.jsx
 │   ├── IngredientCard.jsx
 │   ├── IngredientForm.jsx
@@ -64,7 +85,6 @@ frontend/src/
 | `contexts/AuthContext.jsx` | — | 조현기 | mini의 `useAuth.jsx`와 같은 내용 |
 | `components/NavBar.jsx` | — | 조현기 | 메뉴: 내 냉장고 · 레시피 검색 · 레시피 쓰기 · 커뮤니티 · 마이페이지 |
 | `components/ProtectedRoute.jsx` | — | 조현기 | 로그인 필요 경로를 감쌈 |
-| `components/SearchFilter.jsx` | — | 조현기 | `RecipeListPage`에서 사용 |
 | `pages/NotFoundPage.jsx` | `*` | 조현기 |  |
 | `pages/LoginPage.jsx` | `/login` | 오효정 |  |
 | `pages/SignUpPage.jsx` | `/signup` | 오효정 | 이메일 인증 |
@@ -72,7 +92,7 @@ frontend/src/
 | `pages/MyPage.jsx` | `/mypage` | 오효정 | 로그인 필요 |
 | `pages/RecipeCreatePage.jsx` | `/recipes/new` | 오효정 | 로그인 필요 |
 | `pages/RecipeEditPage.jsx` | `/recipes/:id/edit` | 오효정 | 로그인 · 본인만 |
-| `components/CommentSection.jsx` | — | 오효정 | `RecipeDetailPage`에서 사용 |
+| `components/CommentSection.jsx` | — | 조현기 (원래 오효정) | `RecipeDetailPage`에서 사용. 레시피 댓글 API(`recipe_comment.py`)와 같은 담당 |
 | `pages/HomePage.jsx` | `/` | 조현기 |  |
 | `pages/FridgePage.jsx` | `/fridge` | 정호진 | 로그인 필요. 조리도구 탭도 이 화면 안 |
 | `components/IngredientForm.jsx` | — | 정호진 | 재료 등록 · 수정 |
@@ -130,7 +150,7 @@ frontend/src/
 
 ## 화면 결정 사항 (와이어프레임 v6)
 
-- 레시피 추천: 냉장고 재료 일치율 70% 이상만. 필수 재료 없음. 70%는 백엔드 설정 `MATCH_RATE`로만 바꾼다 (화면에서 못 바꿈).
+- 레시피 추천: 냉장고 재료 일치율 50% 이상만 (11/22에 70% → 50%). 필수 재료 없음. 기준은 백엔드 설정 `MATCH_RATE`로만 바꾼다 (화면에서 못 바꿈).
 - 보관 위치(냉장 · 냉동 · 실온) 없음.
 - 재료 단위: 육류 `g`(1–999), 음료 `L`, 나머지 `개`(1–99).
 - 내 냉장고는 소비기한 순 정렬. 소비기한이 지난 재료는 확인창을 띄운 뒤 자동 삭제.

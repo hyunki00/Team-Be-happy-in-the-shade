@@ -9,6 +9,7 @@ const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL ?? "http://localhost:8044",
   // 로그인 쿠키(access_token, refresh_token)를 같이 보내고 받기 위해 꼭 필요
   withCredentials: true,
+  timeout: 10000, // 서버 응답이 없으면 재시도할 수 있도록 오류를 표시
 });
 
 export default api;

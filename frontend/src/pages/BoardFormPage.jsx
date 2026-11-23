@@ -1,5 +1,10 @@
 // 담당: 임유빈
 // 커뮤니티 게시물 작성 페이지 [아직 수정중]
+// [디자인 11/22 조현기] 시안 F 적용 — className(모양)만 바꿈, 작성 · 사진 · 레시피 연결 로직은 그대로
+//   1. 작성 폼 · 레시피 검색 창: 흰 둥근 카드(rounded-card · shadow-card)
+//   2. 등록 버튼: 검정 → 포인트색(accent), 버튼 · 한 줄 입력칸은 알약 모양(rounded-pill)
+//   3. 필수(*) · 연결 해제 글씨: 빨강 → 시안 색(miss), 입력칸 포커스 테두리는 포인트색
+//   4. 회색(gray) 클래스는 그대로 둠 — index.css에서 따뜻한 회색으로 바뀌어 있음
 // 후기작성 경로 [아직 수정/작성중..]
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
@@ -30,14 +35,20 @@ export default function BoardFormPage({ posts = mockPosts, onSavePost }) {
   useEffect(() => {
     if (isEditMode) {
       const targetPost = posts.find((p) => String(p.post_id) === String(id));
-      if (targetPost) {
-        setTitle(targetPost.title || '');
-        setContent(targetPost.content || '');
-        setImages(targetPost.images || []);
-        setLinkedRecipe(targetPost.linked_recipe || null);
+      
+      // 수정하려는 글이 존재하지 않은 경우 추가(없는 게시글수정 주소로 들어갈 경우)
+      if (!targetPost) {
+        alert('존재하지 않거나 이미 삭제된 게시글입니다.');
+        navigate('/board', { replace: true }); // 목록으로 강제 이동
+        return;
       }
+
+      setTitle(targetPost.title || '');
+      setContent(targetPost.content || '');
+      setImages(targetPost.images || []);
+      setLinkedRecipe(targetPost.linked_recipe || null);
     }
-  }, [id, isEditMode, posts]);
+  }, [id, isEditMode, posts, navigate]);
 
   // 필수 조건 충족 여부 (제목, 본문 공백 불가)
   const isValid = title.trim() !== '' && content.trim() !== '';
@@ -98,17 +109,17 @@ export default function BoardFormPage({ posts = mockPosts, onSavePost }) {
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-8 relative">
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">
+      <h1 className="text-3xl font-black text-ink mb-6">
         {isEditMode ? '게시글 수정' : '커뮤니티 글쓰기'}
       </h1>
 
-      <form onSubmit={handleSubmit} className="space-y-6 bg-white p-6 border rounded-xl shadow-sm">
+      <form onSubmit={handleSubmit} className="space-y-6 bg-white p-6 rounded-card shadow-card">
 
         {/* 1. 제목 입력 */}
         <div>
           <div className="flex justify-between items-center mb-1">
             <label className="text-sm font-semibold text-gray-700">
-              제목 <span className="text-red-500">*</span>
+              제목 <span className="text-miss">*</span>
             </label>
             <span className="text-xs text-gray-400">{title.length} / {BOARD_TITLE_MAX}자</span>
           </div>
@@ -118,7 +129,7 @@ export default function BoardFormPage({ posts = mockPosts, onSavePost }) {
             value={title}
             maxLength={BOARD_TITLE_MAX}
             onChange={(e) => setTitle(e.target.value)}
-            className="w-full border rounded-lg px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-400 border-gray-300"
+            className="w-full border rounded-pill px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent border-gray-300"
           />
         </div>
 
@@ -126,7 +137,7 @@ export default function BoardFormPage({ posts = mockPosts, onSavePost }) {
         <div>
           <div className="flex justify-between items-center mb-1">
             <label className="text-sm font-semibold text-gray-700">
-              본문 <span className="text-red-500">*</span>
+              본문 <span className="text-miss">*</span>
             </label>
             <span className="text-xs text-gray-400">{content.length} / {BOARD_CONTENT_MAX}자</span>
           </div>
@@ -136,7 +147,7 @@ export default function BoardFormPage({ posts = mockPosts, onSavePost }) {
             maxLength={BOARD_CONTENT_MAX}
             rows={8}
             onChange={(e) => setContent(e.target.value)}
-            className="w-full border rounded-lg p-3.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-400 border-gray-300"
+            className="w-full border rounded-lg p-3.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent border-gray-300"
           />
         </div>
 
@@ -199,7 +210,7 @@ export default function BoardFormPage({ posts = mockPosts, onSavePost }) {
               <button
                 type="button"
                 onClick={() => setLinkedRecipe(null)}
-                className="text-xs text-red-500 hover:underline font-medium"
+                className="text-xs text-miss hover:underline font-medium"
               >
                 연결 해제
               </button>
@@ -208,7 +219,7 @@ export default function BoardFormPage({ posts = mockPosts, onSavePost }) {
             <button
               type="button"
               onClick={() => setIsModalOpen(true)}
-              className="px-4 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 transition-colors"
+              className="px-4 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-pill hover:bg-gray-200 transition-colors"
             >
               🔍 레시피 검색 및 연결
             </button>
@@ -220,14 +231,14 @@ export default function BoardFormPage({ posts = mockPosts, onSavePost }) {
           <button
             type="button"
             onClick={handleCancel}
-            className="px-5 py-2.5 bg-gray-100 text-gray-700 font-medium rounded-lg text-sm hover:bg-gray-200 transition-colors"
+            className="px-5 py-2.5 bg-gray-100 text-gray-700 font-medium rounded-pill text-sm hover:bg-gray-200 transition-colors"
           >
             취소
           </button>
           <button
             type="submit"
             disabled={!isValid}
-            className="px-5 py-2.5 bg-gray-900 text-white font-medium rounded-lg text-sm hover:bg-gray-800 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
+            className="px-5 py-2.5 bg-accent text-white font-medium rounded-pill text-sm hover:bg-accent-dark transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
           >
             {isEditMode ? '저장하기' : '등록하기'}
           </button>
@@ -264,7 +275,7 @@ function RecipeSearchModal({ onClose, onSelect }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
       {/* 모달 창 본체 */}
-      <div className="bg-white w-full max-w-lg rounded-2xl shadow-xl overflow-hidden flex flex-col max-h-[80vh]">
+      <div className="bg-white w-full max-w-lg rounded-card shadow-card overflow-hidden flex flex-col max-h-[80vh]">
 
         {/* 모달 헤더 */}
         <div className="px-6 py-4 border-b flex justify-between items-center">
@@ -286,7 +297,7 @@ function RecipeSearchModal({ onClose, onSelect }) {
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             autoFocus
-            className="w-full border rounded-lg px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-400 border-gray-300 bg-white"
+            className="w-full border rounded-pill px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-accent border-gray-300 bg-white"
           />
         </div>
 
@@ -305,7 +316,7 @@ function RecipeSearchModal({ onClose, onSelect }) {
               <div
                 key={recipe.recipe_id}
                 onClick={() => onSelect(recipe)}
-                className="flex items-center justify-between p-3 border rounded-xl hover:bg-gray-50 cursor-pointer transition-colors"
+                className="flex items-center justify-between p-3 rounded-[20px] hover:bg-gray-50 cursor-pointer transition-colors"
               >
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 bg-gray-200 rounded-lg overflow-hidden shrink-0">
@@ -316,7 +327,7 @@ function RecipeSearchModal({ onClose, onSelect }) {
                     <p className="text-xs text-gray-500 mt-0.5">{recipe.nickname} · {recipe.cooking_time}분 · {recipe.level}</p>
                   </div>
                 </div>
-                <span className="text-xs font-semibold text-gray-700 bg-gray-100 px-3 py-1.5 rounded-lg">
+                <span className="text-xs font-semibold text-gray-700 bg-gray-100 px-3 py-1.5 rounded-pill">
                   선택
                   </span>
               </div>
@@ -329,7 +340,7 @@ function RecipeSearchModal({ onClose, onSelect }) {
           <button 
             type="button" 
             onClick={onClose} 
-            className="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-300 transition-colors"
+            className="px-4 py-2 bg-gray-200 text-gray-700 text-sm font-medium rounded-pill hover:bg-gray-300 transition-colors"
             >
               닫기
               </button>

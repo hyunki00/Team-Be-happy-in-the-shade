@@ -1,10 +1,16 @@
-// 담당: 권우정 
+// 담당: 권우정
+// [병합 11/23 조현기] woojung 브랜치(DB 연결 · 주석 정리) + main 디자인(11/22) 합침
+//   - 검색 · 필터 · 페이지 · 정렬 로직은 woojung 브랜치 그대로 (mockData → 실제 DB)
+//   - 화면 모양은 main 디자인 그대로 (왼쪽 필터 칩, 위쪽 스위치, 식재료 선택 모달), 아래 페이지 버튼만 새로 꾸밈
+//   - 서버 요청을 직접 주소(127.0.0.1) 대신 api.js로: 프로젝트 규칙(요청은 api.js 하나로)
+//     + 127.0.0.1로 보내면 localhost에서 받은 로그인 쿠키가 같이 안 가는 문제
+//   - 일치율 막대는 재료를 골랐을 때만 표시 (안 고르면 서버가 일치율을 주지 않음)
+//   - '내 냉장고 재료 우선' 스위치는 woojung 브랜치처럼 아직 검색 조건에 반영 안 됨 → 켜면 "준비 중" 안내
+// [디자인 11/22 조현기] 시안 F + 와이어프레임 p.15~17 레이아웃 (왼쪽 필터 칩 · 위쪽 스위치 · 식재료 선택 모달 · 카드 한 줄 최대 3개)
 import RecipeCard from "../components/RecipeCard";
 import { useState, useEffect } from "react";
 import { useAuth } from "../contexts/AuthContext"
-
-// 레시피와 식재료 데이터를 요청할 백엔드 서버 주소
-const API_URL = "http://127.0.0.1:8044";
+import api from "../api"; // [병합] 공통 api
 
 function RecipeListPage() {
   // 검색 및 필터 조건을 하나의 객체로 관리
@@ -104,16 +110,10 @@ function RecipeListPage() {
         params.append("limit", PAGE_SIZE + 1);
         params.append("offset", (page - 1) * PAGE_SIZE);
 
-        const response = await fetch(
-          `${API_URL}/recipes?${params.toString()}`,
-          { signal: controller.signal }
-        );
-
-        if (!response.ok) {
-          throw new Error("레시피 조회 실패");
-        }
-
-        const data = await response.json();
+        // [병합] api.js로 요청 (실패하면 axios가 오류를 던짐)
+        const { data } = await api.get(`/recipes?${params.toString()}`, {
+          signal: controller.signal,
+        });
 
         // 취소되지 않은 최신 요청의 결과만 반영
         if (!controller.signal.aborted) {
@@ -125,8 +125,9 @@ function RecipeListPage() {
         }
 
       } catch (err) {
-        if (err.name !== "AbortError") {
-          setError(err.message);
+        // [병합] axios는 요청 취소를 ERR_CANCELED로 알려 줌
+        if (err.code !== "ERR_CANCELED") {
+          setError("레시피를 불러오지 못했습니다.");
         }
       } finally {
         if (!controller.signal.aborted) {
@@ -154,17 +155,11 @@ function RecipeListPage() {
     // 식재료 목록과 식재료 카테고리를 함께 조회
     const fetchIngredients = async () => {
       try {
-        const [ingredientResponse, categoryResponse] = await Promise.all([
-          fetch(`${API_URL}/ingredients`),
-          fetch(`${API_URL}/ingredients/categories`)
+        // [병합] api.js로 요청
+        const [{ data: ingredientData }, { data: categoryData }] = await Promise.all([
+          api.get("/ingredients"),
+          api.get("/ingredients/categories"),
         ]);
-
-        if (!ingredientResponse.ok || !categoryResponse.ok) {
-          throw new Error("식재료 조회 실패");
-        }
-
-        const ingredientData = await ingredientResponse.json();
-        const categoryData = await categoryResponse.json();
 
         setIngredients(ingredientData);
         setIngredientCategories(categoryData);
@@ -268,14 +263,56 @@ function RecipeListPage() {
       ingredient.ing_category_id === ingredientCategory)
   );
 
+  // 고른 재료 하나만 검색에서 빼기 (왼쪽 필터의 재료 칩 ✕)
+  const handleIngredientRemove = (ingId) => {
+    setFilters((prev) => ({
+      ...prev,
+      ingredients: prev.ingredients.filter((id) => id !== ingId),
+    }));
+  };
+
+  // 식재료 선택 창은 Esc로도 닫힘 (와이어프레임 p.16)
+  useEffect(() => {
+    if (!isIngredientOpen) return;
+    const onKeyDown = (e) => {
+      if (e.key === "Escape") {
+        setTempIngredients(filters.ingredients);
+        setIsIngredientOpen(false);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isIngredientOpen, filters.ingredients]);
+
+  // 왼쪽 필터 칩: 고른 값을 다시 누르면 '전체'로 돌아감
+  const toggleFilter = (key, value) =>
+    setFilters((prev) => ({ ...prev, [key]: prev[key] === value ? null : value }));
+
+  const chipClass = (isOn) =>
+    `inline-flex items-center h-9 px-3.5 rounded-pill text-sm font-medium ${
+      isOn ? "bg-ink text-white" : "bg-gray-100 text-ink hover:bg-gray-200"
+    }`;
+
+  // 왼쪽 필터에 보여 줄 값 (값은 기존 select와 같음)
+  const CATEGORY_OPTIONS = [{ value: 1, label: "밥" }, { value: 4, label: "반찬" }];
+  const LEVEL_OPTIONS = ["초급", "중급", "고급"];
+  const TIME_OPTIONS = [
+    { value: 15, label: "~15분" },
+    { value: 30, label: "~30분" },
+    { value: 60, label: "~60분" },
+    { value: "초과", label: "60분 이상" },
+  ];
+
   return (
-    <div>
-      <h1>레시피 목록</h1>
-      {loading && <p>레시피를 불러오는 중...</p>}
-      {error && <p>오류: {error}</p>}
+    <div className="flex flex-col gap-6">
+      <h1 className="text-3xl font-black">레시피 검색</h1>
+
+      {/* ① 검색창 (위 전체 폭) */}
       <input
         type="text"
         placeholder="레시피 제목 검색"
+        aria-label="레시피 제목 검색"
+        className="h-14 w-full rounded-pill border-0 px-6 text-base shadow-card"
         value={filters.keyword}
         onChange={(e) =>
           setFilters({
@@ -283,216 +320,315 @@ function RecipeListPage() {
             keyword: e.target.value,
           })
         }
-      /> 
-      <p>현재 검색어 : {filters.keyword}</p> <br />
+      />
 
-      <h3>식재료 선택</h3>
+      {/* 아래: 왼쪽 필터(260px) + 오른쪽 결과 */}
+      <div className="grid items-start gap-6 lg:grid-cols-[260px_1fr]">
 
-      <button
-        onClick={() => {
-          if (isIngredientOpen) {
-            handleIngredientCancel();
-          } else {
-            setTempIngredients([...filters.ingredients]);
-            setIsIngredientOpen(true);
-          }
-        }}
-      >
-        {isIngredientOpen ? "닫기" : "+ 식재료 선택"}
-      </button> <br />
+        {/* ② 왼쪽 필터 */}
+        <aside aria-label="필터" className="flex flex-col gap-6 rounded-card bg-surface p-6 shadow-card">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-black">필터</h2>
+            <button type="button" className="text-sm text-muted underline hover:text-accent" onClick={handleReset}>
+              초기화
+            </button>
+          </div>
 
-      <button
-        disabled={!isAuthenticated}
-        onClick={() => setIsAllIngredientsOn((prev) => !prev)}
-      >
-        모든 재료 일치: {isAllIngredientsOn ? "ON" : "OFF"}
-      </button> <br />
+          {/* 재료: 고른 재료 칩 + 식재료 선택 */}
+          <div className="flex flex-col gap-2">
+            <h3 className="text-sm font-bold text-ink-soft">재료</h3>
+            {filters.ingredients.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {ingredients
+                  .filter((ingredient) => filters.ingredients.includes(ingredient.ing_id))
+                  .map((ingredient) => (
+                    <button
+                      key={ingredient.ing_id}
+                      type="button"
+                      aria-label={`${ingredient.ing_name} 빼기`}
+                      className="inline-flex items-center h-9 px-3.5 rounded-pill bg-ink text-sm font-bold text-white"
+                      onClick={() => handleIngredientRemove(ingredient.ing_id)}
+                    >
+                      {ingredient.ing_name} ✕
+                    </button>
+                  ))}
+              </div>
+            )}
+            <button
+              type="button"
+              className="inline-flex items-center justify-center h-10 rounded-pill border border-gray-300 text-sm font-medium hover:border-accent hover:text-accent"
+              onClick={() => {
+                setTempIngredients([...filters.ingredients]);
+                setIsIngredientOpen(true);
+              }}
+            >
+              + 식재료 선택
+            </button>
+            {/* 실제 검색에 적용된 재료까지 삭제 */}
+            {filters.ingredients.length > 0 && (
+              <button type="button" className="self-start text-xs text-muted underline hover:text-accent" onClick={handleIngredientClear}>
+                검색 재료 초기화
+              </button>
+            )}
+          </div>
 
-      {/* 실제 검색에 적용된 재료까지 삭제 */}
-      <button
-        onClick={handleIngredientClear}
-        disabled={filters.ingredients.length === 0}
-      >
-        검색 재료 초기화
-      </button> <br />
+          <div className="flex flex-col gap-2">
+            <h3 className="text-sm font-bold text-ink-soft">요리 종류</h3>
+            <div className="flex flex-wrap gap-1.5">
+              {CATEGORY_OPTIONS.map((option) => (
+                <button key={option.value} type="button" aria-pressed={filters.r_category_id === option.value}
+                  className={chipClass(filters.r_category_id === option.value)}
+                  onClick={() => toggleFilter("r_category_id", option.value)}>
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
 
-      {isIngredientOpen && (
-        <div>
-          <input
-            type="text"
-            placeholder="식재료 이름 검색"
-            value={ingredientKeyword}
-            onChange={(e) => setIngredientKeyword(e.target.value)}
-          /> <br />
-          <select
-            value={ingredientCategory ?? ""}
-            onChange={(e) =>
-              setIngredientCategory(
-                e.target.value === "" ? null : Number(e.target.value)
-              )
-            }
+          <div className="flex flex-col gap-2">
+            <h3 className="text-sm font-bold text-ink-soft">난이도</h3>
+            <div className="flex flex-wrap gap-1.5">
+              {LEVEL_OPTIONS.map((level) => (
+                <button key={level} type="button" aria-pressed={filters.level === level}
+                  className={chipClass(filters.level === level)}
+                  onClick={() => toggleFilter("level", level)}>
+                  {level}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <h3 className="text-sm font-bold text-ink-soft">조리 시간</h3>
+            <div className="flex flex-wrap gap-1.5">
+              {TIME_OPTIONS.map((option) => (
+                <button key={option.value} type="button" aria-pressed={filters.cooking_time === option.value}
+                  className={chipClass(filters.cooking_time === option.value)}
+                  onClick={() => toggleFilter("cooking_time", option.value)}>
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </aside>
+
+        {/* 오른쪽 결과 */}
+        <section className="flex min-w-0 flex-col gap-5">
+
+          {/* ③ 내 냉장고 재료 우선 스위치 (와이어프레임 p.15·17): 결과 맨 위 */}
+          <div
+            className={`flex flex-wrap items-center gap-x-4 gap-y-1 rounded-[20px] px-5 py-3 ${
+              isAllIngredientsOn ? "bg-have-soft" : "bg-surface shadow-card"
+            }`}
           >
-            <option value="">전체 재료</option>
-            {ingredientCategories.map((category) => (
-              <option
-                key={category.ing_category_id}
-                value={category.ing_category_id}
-              >
-                {category.category_name}
-              </option>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={isAllIngredientsOn}
+              aria-label="내 냉장고 재료 우선"
+              disabled={!isAuthenticated}
+              onClick={() => setIsAllIngredientsOn((prev) => !prev)}
+              className={`relative h-7 w-12 flex-none rounded-pill transition-colors disabled:opacity-40 ${
+                isAllIngredientsOn ? "bg-have" : "bg-gray-300"
+              }`}
+            >
+              <span
+                className={`absolute top-1 left-1 h-5 w-5 rounded-full bg-surface transition-transform ${
+                  isAllIngredientsOn ? "translate-x-5" : ""
+                }`}
+              />
+            </button>
+            <span className={`font-bold ${isAllIngredientsOn ? "text-have" : "text-ink"}`}>내 냉장고 재료 우선</span>
+            {/* [병합] 켰을 때 안내. woojung 브랜치에서도 아직 검색 조건에 반영 전이라 '준비 중'으로 표시 */}
+            {isAllIngredientsOn ? (
+              <div className="basis-full flex flex-col gap-0.5 pl-16 text-sm text-have">
+                <p>내 냉장고 재료로 만들 수 있는 요리를 먼저 보여 주는 기능이에요.</p>
+                <p className="mt-1 self-start rounded-[8px] bg-surface px-2.5 py-1">
+                  지금은 준비 중이라 검색 결과에는 아직 반영되지 않아요.
+                </p>
+              </div>
+            ) : (
+              !isAuthenticated && <span className="text-sm text-muted">로그인하면 켤 수 있어요</span>
+            )}
+          </div>
+
+          {/* ④ 결과 개수 + 정렬 */}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-lg font-black">
+              검색 결과 <span className="text-accent">{filteredRecipes.length}개</span>{(page > 1 || hasNextPage) && <span className="ml-2 text-sm font-medium text-muted">(이 페이지)</span>}
+            </p>
+            <select
+              aria-label="정렬"
+              className="h-10 rounded-pill pr-8 text-sm"
+              value={filters.sort}
+              onChange={(e) =>
+                setFilters({
+                  ...filters,
+                  sort: e.target.value,
+                })
+              }
+            >
+              <option value="name">가나다순</option>
+              <option value="match_rate">일치율 높은 순</option>
+            </select>
+          </div>
+
+          {/* [병합] 불러오는 중 · 오류 (woojung 브랜치) */}
+          {loading && <p role="status" className="text-muted">레시피를 불러오는 중...</p>}
+          {error && <p role="alert" className="rounded-[16px] bg-miss-soft px-5 py-3 text-miss">{error}</p>}
+
+          {!loading && !error && filteredRecipes.length === 0 && (
+            <p className="rounded-card bg-surface p-8 text-center text-muted shadow-card">검색 결과가 없습니다.</p>
+          )}
+
+          {/* ⑤ 결과 카드: 한 줄에 최대 3개 */}
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
+            {/* [병합] 새 결과를 불러오는 동안에는 예전 카드를 숨김 */}
+            {!loading && sortedRecipes.map((recipe)=>(
+              <RecipeCard
+               key={recipe.recipe_id}
+               recipe={recipe}
+               showMatch={filters.ingredients.length > 0}
+              />
             ))}
-          </select> <br />
-          {filteredIngredients.map((ingredient) => (
-            <span key={ingredient.ing_id}>
-              <button onClick={() => handleIngredientToggle(ingredient.ing_id)}>
-                {ingredient.ing_name}
-                {tempIngredients.includes(ingredient.ing_id) ? "✓" : ""}
-              </button>{" "}
-            </span>
-          ))}
-          {filteredIngredients.length === 0 && (
-            <p>검색 결과가 없습니다.</p>
-          )}
+          </div>
 
+          {/* [병합] 페이지 이동 (woojung 브랜치, 한 페이지 20개) */}
+          <div className="flex items-center justify-center gap-3 pt-2">
+            <button
+              type="button"
+              className="h-10 rounded-pill bg-surface px-5 text-sm font-medium shadow-card hover:bg-gray-50 disabled:opacity-40"
+              disabled={page === 1 || loading}
+              onClick={() => setPage((prev) => prev - 1)}
+            >
+              ‹ 이전
+            </button>
+            <span className="text-sm font-bold">{page} 페이지</span>
+            <button
+              type="button"
+              className="h-10 rounded-pill bg-surface px-5 text-sm font-medium shadow-card hover:bg-gray-50 disabled:opacity-40"
+              disabled={loading || !hasNextPage}
+              onClick={() => setPage((prev) => prev + 1)}
+            >
+              다음 ›
+            </button>
+          </div>
+        </section>
+      </div>
 
-          <p>선택한 재료 수 : {tempIngredients.length}개</p> <br />
+      {/* ⑥ 식재료 선택 창 (와이어프레임 p.16): 화면 위에 뜨는 창, ✕ · Esc로 닫으면 선택 취소 */}
+      {isIngredientOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div role="dialog" aria-modal="true" aria-labelledby="ingredient-dialog-title"
+            className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-card bg-surface shadow-card">
+            <div className="flex items-center justify-between border-b border-line px-6 py-4">
+              <h2 id="ingredient-dialog-title" className="text-xl font-black">식재료 선택</h2>
+              <button type="button" aria-label="닫기" className="h-10 w-10 rounded-full text-xl hover:bg-gray-100" onClick={handleIngredientCancel}>
+                ✕
+              </button>
+            </div>
 
-          <h4>선택한 재료</h4>
-          {/* 선택한 재료 0개 -> 안내 문구 표시 / 1개 이상 -> 안내 문구 숨김, 선택한 재료 버튼 표시 */}
-          {tempIngredients.length === 0 && (
-            <p>선택한 재료가 없습니다.</p>
-          )}
+            <div className="grid min-h-0 flex-1 gap-0 overflow-y-auto md:grid-cols-[1fr_260px]">
+              {/* 왼쪽: 찾기 · 분류 · 재료 칩 */}
+              <div className="flex flex-col gap-4 p-6">
+                <div className="flex flex-wrap gap-2">
+                  <input
+                    type="text"
+                    placeholder="식재료 이름 검색"
+                    aria-label="식재료 이름 검색"
+                    className="h-11 min-w-0 flex-1 rounded-pill px-5"
+                    value={ingredientKeyword}
+                    onChange={(e) => setIngredientKeyword(e.target.value)}
+                  />
+                  <select
+                    aria-label="재료 대분류"
+                    className="h-11 rounded-pill pr-8"
+                    value={ingredientCategory ?? ""}
+                    onChange={(e) =>
+                      setIngredientCategory(
+                        e.target.value === "" ? null : Number(e.target.value)
+                      )
+                    }
+                  >
+                    <option value="">전체 재료</option>
+                    {ingredientCategories.map((category) => (
+                      <option
+                        key={category.ing_category_id}
+                        value={category.ing_category_id}
+                      >
+                        {category.category_name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-          {ingredients
-            .filter((ingredient) => tempIngredients.includes(ingredient.ing_id))
-            .map((ingredient) => (
-              <span key={ingredient.ing_id}>
-                <button onClick={() => handleIngredientToggle(ingredient.ing_id)}>
-                  {ingredient.ing_name} ✕
-                </button>{" "}
-              </span>
-            ))} <br />
+                <div className="flex flex-wrap gap-2">
+                  {filteredIngredients.map((ingredient) => (
+                    <button
+                      key={ingredient.ing_id}
+                      type="button"
+                      aria-pressed={tempIngredients.includes(ingredient.ing_id)}
+                      className={chipClass(tempIngredients.includes(ingredient.ing_id))}
+                      onClick={() => handleIngredientToggle(ingredient.ing_id)}
+                    >
+                      {tempIngredients.includes(ingredient.ing_id) ? "✓ " : ""}
+                      {ingredient.ing_name}
+                    </button>
+                  ))}
+                </div>
+                {filteredIngredients.length === 0 && (
+                  <p className="text-muted">검색 결과가 없습니다.</p>
+                )}
+                <p className="text-xs text-muted">누르면 선택, 다시 누르면 해제</p>
+              </div>
 
-          {/* 선택창 안에서 임시로 고른 재료만 삭제 */}
-          <button
-            onClick={() => setTempIngredients([])}
-            disabled={tempIngredients.length === 0}
-          >
-            모두 지우기
-          </button> <br />
-
-          <button
-            onClick={handleIngredientConfirm}
-            disabled={tempIngredients.length === 0}
-          >
-            이 재료로 레시피 찾기 ({tempIngredients.length})
-          </button> <br />
+              {/* 오른쪽: 선택한 재료 + 찾기 버튼 */}
+              <div className="flex flex-col gap-3 bg-gray-50 p-6">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-bold">
+                    선택한 재료 <span className="text-accent">{tempIngredients.length}</span>
+                  </h4>
+                  {/* 선택창 안에서 임시로 고른 재료만 삭제 */}
+                  <button
+                    type="button"
+                    className="text-sm text-muted underline hover:text-accent disabled:opacity-40"
+                    onClick={() => setTempIngredients([])}
+                    disabled={tempIngredients.length === 0}
+                  >
+                    모두 지우기
+                  </button>
+                </div>
+                {/* 선택한 재료 0개 -> 안내 문구 표시 / 1개 이상 -> 안내 문구 숨김, 선택한 재료 버튼 표시 */}
+                {tempIngredients.length === 0 && (
+                  <p className="text-sm text-muted">선택한 재료가 없습니다.</p>
+                )}
+                <div className="flex flex-wrap gap-2">
+                  {ingredients
+                    .filter((ingredient) => tempIngredients.includes(ingredient.ing_id))
+                    .map((ingredient) => (
+                      <button
+                        key={ingredient.ing_id}
+                        type="button"
+                        className="inline-flex items-center h-9 px-3.5 rounded-pill bg-ink text-sm font-bold text-white"
+                        onClick={() => handleIngredientToggle(ingredient.ing_id)}
+                      >
+                        {ingredient.ing_name} ✕
+                      </button>
+                    ))}
+                </div>
+                <button
+                  type="button"
+                  className="mt-auto h-12 rounded-pill bg-accent font-bold text-white hover:bg-accent-dark disabled:opacity-40"
+                  onClick={handleIngredientConfirm}
+                  disabled={tempIngredients.length === 0}
+                >
+                  이 재료로 레시피 찾기 ({tempIngredients.length}) →
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
-
-      {/* filters.level이 null 또는 undefined이면 빈 문자열 "" 사용 */}
-      <select
-        value={filters.level ?? ""}
-        onChange={(e) =>
-          setFilters({
-            ...filters,
-            level: e.target.value === "" ? null : e.target.value,
-          })
-        }
-      >
-        <option value="">전체 난이도</option>
-        <option value="초급">초급</option>
-        <option value="중급">중급</option>
-        <option value="고급">고급</option>
-      </select> <br />
-
-      <select
-        value={filters.cooking_time ?? ""}
-        onChange={(e) =>
-          setFilters({
-            ...filters,
-            cooking_time:
-              e.target.value === ""
-                ? null
-                : e.target.value === "초과"
-                ? "초과"
-                : Number(e.target.value),
-          })
-        }
-      >
-        <option value="">전체 시간</option>
-        <option value="15">15분 이하</option>
-        <option value="30">30분 이하</option>
-        <option value="60">60분 이하</option>
-        <option value="초과">60분 초과</option>
-      </select> <br />      
-
-      <select
-        value={filters.r_category_id ?? ""}
-        onChange={(e) =>
-          setFilters({
-            ...filters,
-            r_category_id:
-              e.target.value === "" ? null : Number(e.target.value),
-          })
-        }
-      >
-        <option value="">전체 요리</option>
-        <option value="1">밥</option>
-        <option value="4">반찬</option>
-      </select> <br />
-
-      <select
-        value={filters.sort}
-        onChange={(e) =>
-          setFilters({
-            ...filters,
-            sort: e.target.value,
-          })
-        }
-      >
-        <option value="name">가나다순</option>
-        <option value="match_rate">일치율 높은 순</option>
-      </select> <br />      
-
-      <button type="button" onClick={handleReset}>
-        검색 조건 초기화
-      </button> <br />     
-
-      <p>검색 결과: {filteredRecipes.length}개</p>
-
-      {filteredRecipes.length === 0 && (
-        <p>검색 결과가 없습니다.</p>
-      )}
-
-      {sortedRecipes.map((recipe)=>(
-        <RecipeCard
-         key={recipe.recipe_id}
-         recipe={recipe}
-         showMatch={true}
-        />
-      ))}
-
-      {/* 페이지 이동 */}
-      <div>
-        <button
-          type="button"
-          disabled={page === 1 || loading}
-          onClick={() => setPage((prev) => prev - 1)}
-        >
-          이전
-        </button>
-
-        <span> {page} 페이지 </span>
-
-        <button
-          type="button"
-          disabled={loading || !hasNextPage}
-          onClick={() => setPage((prev) => prev + 1)}
-        >
-          다음
-        </button>
-      </div>
     </div>
   );
 }

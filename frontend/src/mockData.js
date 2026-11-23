@@ -14,6 +14,7 @@ export const mockUser = {
   login_id: "user1", // 로그인 아이디 (영문 · 숫자 4~20자)
   email: "user1@test.com", // 회원가입 인증 · 비밀번호 찾기용
   nickname: "요리왕유빈",
+  profile_image: "https://example.com/profile1.jpg",  //프로필 사진
 };
 
 // ── 식재료 · 대분류 (재료 담기, 식재료 선택 모달) ──
