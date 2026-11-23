@@ -6,13 +6,36 @@
 //   3. 빨강 · 파랑 글씨 → 시안 색(miss · have), 입력칸 포커스 테두리는 포인트색
 //   4. 회색(gray) 클래스는 그대로 둠 — index.css에서 따뜻한 회색으로 바뀌어 있음
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BOARD_SORT, BOARD_SEARCH_TYPES } from '../constants';
-import { mockPosts } from '../mockData';
+import api from '../api'; 
 
-export default function BoardListPage({ posts = mockPosts }) {
+//게시글생성 시간 표기
+function formatBoardDate(dateValue) {
+  if (!dateValue) return '방금 전';
+  if (typeof dateValue === 'string' && dateValue.includes('방금')) return dateValue;
+
+  if (typeof dateValue === 'string') {
+    const match = dateValue.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (match) {
+      return `${match[1]}.${match[2]}.${match[3]}`;
+    }
+  }
+
+  const date = new Date(dateValue);
+  if (Number.isNaN(date.getTime())) return String(dateValue);
+
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}.${month}.${day}`;
+}
+
+export default function BoardListPage() {
   const navigate = useNavigate();
+
+  const [posts, setPosts] = useState([]);
 
   // 1. 상태 관리 (정렬, 검색타입, 검색어)
   const [sortType, setSortType] = useState('latest'); // 'latest' | 'popular'
@@ -32,33 +55,29 @@ export default function BoardListPage({ posts = mockPosts }) {
     setActiveKeyword('');
   };
 
-  // 4. 필터링 및 정렬 로직
-  const filteredPosts = posts
-    .filter((post) => {
-      if (!activeKeyword) return true;
-      if (searchType === 'title') {
-        return post.title?.toLowerCase().includes(activeKeyword.toLowerCase());
-      }
-      if (searchType === 'author') {
-        return post.nickname?.toLowerCase().includes(activeKeyword.toLowerCase());
-      }
-      // title_content (제목 + 본문)
-      return (
-        post.title?.toLowerCase().includes(activeKeyword.toLowerCase()) ||
-        post.content?.toLowerCase().includes(activeKeyword.toLowerCase())
-      );
-    })
-    .sort((a, b) => {
-      if (sortType === 'popular') {
-        // 인기순: 좋아요 높은 순, 같으면 최신순 (post_id 내림차순)
-        if (b.like_count === a.like_count) {
-          return b.post_id - a.post_id;
-        }
-        return (b.like_count || 0) - (a.like_count || 0);
-      }
-      // 최신순 (post_id 내림차순)
-      return b.post_id - a.post_id;
-    });
+  // 정렬·검색 조건이 바뀔 때 GET /posts 호출
+  useEffect(() => {
+    const controller = new AbortController();
+
+    const params = { sort: sortType };
+    if (activeKeyword) {
+      params.search_type = searchType;
+      params.keyword = activeKeyword;
+    }
+
+    api
+      .get('/posts', { params, signal: controller.signal })
+      .then(({ data }) => {
+        setPosts(Array.isArray(data) ? data : []);
+      })
+      .catch((err) => {
+        if (err.code === 'ERR_CANCELED') return;
+        
+      });
+
+    return () => controller.abort();
+  }, [sortType, searchType, activeKeyword]);
+
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-6">
@@ -123,7 +142,7 @@ export default function BoardListPage({ posts = mockPosts }) {
       </div>
 
       {/* 게시글 목록 영역 */}
-      {filteredPosts.length === 0 ? (
+      {posts.length === 0 ? (
         // 빈 화면 처리 (글이 없거나 검색 결과가 없을 때)
         <div className="py-16 text-center rounded-card bg-surface shadow-card my-6">
           {activeKeyword ? (
@@ -151,7 +170,7 @@ export default function BoardListPage({ posts = mockPosts }) {
       ) : (
         // 게시글 리스트
         <div className="divide-y divide-line rounded-card bg-surface px-4 shadow-card">
-          {filteredPosts.map((post) => (
+          {posts.map((post) => (
             <div
               key={post.post_id}
               onClick={() => navigate(`/board/${post.post_id}`)}
@@ -166,10 +185,10 @@ export default function BoardListPage({ posts = mockPosts }) {
                   </h2>
                 </div>
 
-                {/* 메타 정보: 작성자 | 작성일 | 조회수 | 좋아요 | 댓글 */}
+                {/* 메타 정보: 작성자 | 작성일 | 좋아요 | 댓글 */}
                 <div className="flex items-center gap-3 text-xs text-gray-500">
                   <span className="font-medium text-gray-700">{post.nickname || '익명'}</span>
-                  <span>{post.created_at || '방금 전'}</span>                  
+                  <span>{formatBoardDate(post.created_at)}</span>
                   <span className="flex items-center gap-0.5 text-miss font-medium">
                     ♡ {post.like_count || 0}
                   </span>
