@@ -5,8 +5,17 @@
 //   2. 댓글 등록 · 저장 등 주요 버튼: 검정 → 포인트색(accent), 버튼 · 입력칸은 알약 모양(rounded-pill)
 //   3. 좋아요 누른 상태 · 삭제 글씨: 빨강 → 시안 색(miss), 입력칸 포커스 테두리는 포인트색
 //   4. 회색(gray) 클래스는 그대로 둠 — index.css에서 따뜻한 회색으로 바뀌어 있음
+// [수정 11/24 조현기] 이 파일에서 바뀐 곳
+//   1) (로딩) 불러오는 동안 '삭제되었거나 확인할 수 없는 게시글입니다'가 먼저 뜨던 문제
+//      원인: post가 처음에 null이라, 응답이 오기 전까지 '글이 없음'으로 보고 삭제 안내를 그렸음
+//      해결: '지금 주소의 글 번호를 받아 온 적이 있는지'를 기억해서, 아직이면 회색 자리 카드
+//      - loadedId : 마지막으로 응답을 받은 글 번호 (+ 다시 불러오기 횟수). 처음엔 null
+//      - isLoading: 지금 주소의 번호와 다르면 true
+//      - 서버가 404(글 없음)일 때만 '삭제되었거나…' 안내, 그 밖의 실패(서버 꺼짐 등)는 '불러오지 못했어요' + [다시 불러오기]
+//   2) 관련 레시피를 누르면 404 화면이 뜨던 것: 주소 /recipe/ → /recipes/
+//   3) 린트 오류 6개: 안 쓰는 React import, catch (err)에서 안 쓰는 err
 
-import React, { useState, useEffect } from 'react'; // [API 변경] useEffect 추가
+import { useState, useEffect } from 'react'; // [API 변경] useEffect 추가 · [수정 11/24 조현기] 린트: 안 쓰는 React import 삭제 (React 17 이후 JSX에 필요 없음)
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../api'; // [API 변경] mockPosts, mockPostComments 제거 후 공통 api 사용
 import { useAuth } from '../contexts/AuthContext';
@@ -20,6 +29,15 @@ export default function BoardDetailPage({ onDeletePost }) { // [API 변경] post
   // [API 변경] 초기값을 null / []로 두고 useEffect에서 API로 채움
 
   const [post, setPost] = useState(null);
+
+  // [수정 11/24 조현기] (로딩) 위 맨 위 주석 1) 참고
+  //   loadError   : '' = 실패 아님, 'notfound' = 404(글 없음), 'failed' = 그 밖의 실패
+  //   reloadCount : [다시 불러오기]를 누를 때마다 1씩 늘림 → 같은 글도 다시 요청
+  //   다른 글로 이동하면(id가 바뀌면) loadedId와 달라져서 자동으로 '불러오는 중'이 됨
+  const [loadedId, setLoadedId] = useState(null);
+  const [loadError, setLoadError] = useState(''); // '' | 'notfound' | 'failed'
+  const [reloadCount, setReloadCount] = useState(0);
+  const isLoading = loadedId !== `${id}#${reloadCount}`;
 
 
   const [comments, setComments] = useState([]);
@@ -49,15 +67,53 @@ export default function BoardDetailPage({ onDeletePost }) { // [API 변경] post
         setPost(postRes.data);
         setComments(commentRes.data);
         setCurrentImageIndex(0);
+        setLoadError('');
+        setLoadedId(`${id}#${reloadCount}`);
       })
       .catch((err) => {
         if (err.code !== 'ERR_CANCELED') {
           setPost(null);
+          setLoadError(err.response?.status === 404 ? 'notfound' : 'failed');
+          setLoadedId(`${id}#${reloadCount}`);
         }
       });
 
     return () => controller.abort();
-  }, [id]);
+  }, [id, reloadCount]);
+
+  // [수정 11/24 조현기] (로딩) 불러오는 동안: 제목 · 본문 모양의 회색 자리 카드 (animate-pulse: 깜빡이는 효과)
+  if (isLoading) {
+    return (
+      <div role="status" aria-label="게시글을 불러오는 중" className="max-w-4xl mx-auto">
+        <div className="rounded-card bg-surface p-8 shadow-card animate-pulse" aria-hidden="true">
+          <div className="h-8 w-2/3 rounded-pill bg-gray-100" />
+          <div className="mt-4 h-4 w-1/4 rounded-pill bg-gray-100" />
+          <div className="mt-8 flex flex-col gap-3">
+            <div className="h-4 w-full rounded-pill bg-gray-100" />
+            <div className="h-4 w-11/12 rounded-pill bg-gray-100" />
+            <div className="h-4 w-3/4 rounded-pill bg-gray-100" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // [수정 11/24 조현기] (로딩) 404가 아닌 실패 (서버 꺼짐 · 네트워크 오류 등)
+  //   글이 없는 게 아니므로 '삭제되었거나…' 대신 '불러오지 못했어요' + [다시 불러오기]
+  //   (404면 이 아래 원래 코드의 '삭제되었거나 확인할 수 없는 게시글입니다'가 그대로 보임)
+  if (loadError === 'failed') {
+    return (
+      <div className="max-w-4xl mx-auto p-12 text-center">
+        <p role="alert" className="text-gray-500 mb-4">게시글을 불러오지 못했어요.</p>
+        <button
+          onClick={() => setReloadCount((n) => n + 1)}
+          className="px-4 py-2 bg-gray-200 text-gray-700 rounded-pill text-sm hover:bg-gray-300 transition-colors"
+        >
+          다시 불러오기
+        </button>
+      </div>
+    );
+  }
 
   if (!post) {
     return (
@@ -91,7 +147,7 @@ export default function BoardDetailPage({ onDeletePost }) { // [API 변경] post
         is_liked: data.is_liked,
         like_count: data.like_count,
       }));
-    } catch (err) {
+    } catch {   // [수정 11/24 조현기] 린트(no-unused-vars): catch (err)의 err를 안 써서 삭제 (err 없이 catch {만 써도 됨)
       alert('좋아요 처리에 실패했습니다.');
     }
   };
@@ -106,7 +162,7 @@ export default function BoardDetailPage({ onDeletePost }) { // [API 변경] post
         onDeletePost(post.post_id);
       }
       navigate('/board');
-    } catch (err) {
+    } catch {   // [수정 11/24 조현기] 린트(no-unused-vars): catch (err)의 err를 안 써서 삭제 (err 없이 catch {만 써도 됨)
       alert('게시글 삭제에 실패했습니다.');
     }
   };
@@ -128,7 +184,7 @@ export default function BoardDetailPage({ onDeletePost }) { // [API 변경] post
       });
       setComments((prev) => [created, ...prev]);
       setNewComment('');
-    } catch (err) {
+    } catch {   // [수정 11/24 조현기] 린트(no-unused-vars): catch (err)의 err를 안 써서 삭제 (err 없이 catch {만 써도 됨)
       alert('댓글 등록에 실패했습니다.');
     }
   };
@@ -140,7 +196,7 @@ export default function BoardDetailPage({ onDeletePost }) { // [API 변경] post
     try {
       await api.delete(`/post-comments/${pc_id}`);
       setComments((prev) => prev.filter((c) => c.pc_id !== pc_id));
-    } catch (err) {
+    } catch {   // [수정 11/24 조현기] 린트(no-unused-vars): catch (err)의 err를 안 써서 삭제 (err 없이 catch {만 써도 됨)
       alert('댓글 삭제에 실패했습니다.');
     }
   };
@@ -162,7 +218,7 @@ export default function BoardDetailPage({ onDeletePost }) { // [API 변경] post
       setComments((prev) => prev.map((c) => (c.pc_id === pc_id ? updated : c)));
       setEditingCommentId(null);
       setEditText('');
-    } catch (err) {
+    } catch {   // [수정 11/24 조현기] 린트(no-unused-vars): catch (err)의 err를 안 써서 삭제 (err 없이 catch {만 써도 됨)
       alert('댓글 수정에 실패했습니다.');
     }
   };
@@ -276,7 +332,7 @@ function formatBoardDate(dateValue) {
           {/* 관련 레시피 박스 클릭 시 해당 레시피 상세 페이지로 이동 */}
           {post.linked_recipe && (
             <div
-              onClick={() => navigate(`/recipe/${post.linked_recipe.recipe_id}`)}
+              onClick={() => navigate(`/recipes/${post.linked_recipe.recipe_id}`)} // [수정 11/24 조현기] /recipe/ → /recipes/ (레시피 상세 주소는 App.jsx에서 recipes/:id. /recipe/는 없는 주소라 404 화면이 떴음)
               className="mb-6 p-4 bg-gray-50 rounded-[20px] flex items-center justify-between cursor-pointer hover:bg-gray-100 transition-colors"
             >
               <div className="flex items-center gap-3">

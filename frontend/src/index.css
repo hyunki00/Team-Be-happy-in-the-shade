@@ -153,3 +153,15 @@
 .swal2-popup .swal2-styled.swal2-styled:focus-visible {
   box-shadow: 0 0 0 3px var(--color-accent-soft);
 }
+
+/* [11/24 조현기] 메인 첫 배너 오른쪽 음식 사진의 그라데이션 (HomePage.jsx의 HeroFoodImages)
+   사진 층은 카드 오른쪽 65%에만 깔림 (넓은 화면 기준, HomePage.jsx). 아래 %는 그 사진 층 폭 기준
+   mask-image: 검은 부분은 보이고, 투명(transparent) 부분은 안 보이게 가리는 '가림막'
+   왼쪽(글자 쪽)은 완전히 가리고 → 오른쪽으로 갈수록 사진이 드러남
+   - 0% ~ 60%  : 투명 → 검정으로 점점 바뀜 = 사진이 점점 드러남
+   - 60% ~     : 다 드러남 (그래도 전체가 반투명이라 바탕색과 섞여 보임. 투명도는 HomePage.jsx에서)
+   -webkit-가 붙은 줄은 사파리 · 예전 크롬용 (같은 내용) */
+.hero-fade-mask {
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, black 60%);
+  mask-image: linear-gradient(to right, transparent 0%, black 60%);
+}

@@ -3,6 +3,15 @@
 #   - get_user_tool_ids 복구 (권우정: '내 도구로 가능' 계산에 씀, 충돌 때 지워짐)
 #   - 마이페이지용 get_by_user · get_liked_by_user · get_bookmarked_by_user 추가 (routers/user.py가 부름)
 #   - update_by_id: 단계에 step_image_url을 안 보내면 500 나던 것 → .get()으로
+# [수정 11/24 조현기] 레시피 검색 결과 '총 개수'를 세기 위해 두 가지를 바꿈
+#   - apply_filters (새로 꺼냄): get_list 안에 있던 '검색 조건 붙이는 코드'를 그대로 옮긴 함수
+#       get_list(목록)와 count_list(개수)가 '똑같은 조건'을 쓰도록 한 곳에 둠
+#       → 나중에 조건을 바꿀 때 여기 한 곳만 고치면 목록과 개수가 같이 바뀜
+#   - count_list (새로 만듦): 같은 조건으로 레시피가 몇 개인지 (SELECT COUNT(*) …)
+#   ※ get_list가 하는 일(조건 · 정렬 · 페이지)은 그대로
+# [수정 11/24 조현기 2차] 재료 필터를 '포함' 조건으로
+#   - apply_filters · get_list · count_list에 must_ing_ids(꼭 들어가야 하는 재료) 추가
+#   - 넘기면 그 재료가 '모두' 들어간 레시피만 남김 (안 넘기면 원래와 같음)
 # 담당: 권우정 (create · update_by_id · delete_by_id는 오효정이 추가)
 # 할 일: class RecipeCrud
 #   get_list(db, search) / get_by_id(db, recipe_id) / get_ingredient_ids(db, recipe_id)
@@ -41,19 +50,14 @@ user_ingredients_t = table(
 # 레시피 관련 DB 조회 및 추가·삭제를 담당하는 클래스
 class RecipeCrud:
 
-    # 레시피 목록 조회
+    # [수정 11/24 조현기] 검색 조건(검색어 · 요리 종류 · 난이도 · 조리 시간)을 SQL에 붙이는 함수
+    #   원래 get_list 안에 있던 코드를 한 글자도 안 바꾸고 그대로 옮김 (권우정 코드)
+    #   stmt  : 조건을 붙일 SQL. 목록이면 select(Recipe), 개수면 select(func.count())
+    #   search: 화면에서 고른 검색 조건(RecipeSearch). None이면 조건 없이 그대로 돌려줌
+    #   ※ async가 아닌 이유: DB에 묻지 않고 SQL 문장만 만들기 때문 (await 필요 없음)
+    # [수정 11/24 조현기 2차] must_ing_ids: 레시피에 '모두' 들어 있어야 하는 재료 ID (맨 아래에서 처리)
     @staticmethod
-    async def get_list(
-        db: AsyncSession,
-        search=None,
-        limit: int | None = 20,
-        offset: int = 0,
-        sort: str = "latest"
-    ) -> list[Recipe]:
-
-        #select(Recipe) : SELECT * FROM recipes;
-        stmt = select(Recipe)
-
+    def apply_filters(stmt, search=None, must_ing_ids=None):
         # 검색 조건
         if search:
             if search.keyword:
@@ -81,6 +85,53 @@ class RecipeCrud:
                 stmt = stmt.where(
                     Recipe.cooking_time > 60
                 )
+
+        # [수정 11/24 조현기 2차] 고른 재료가 '모두' 들어간 레시피만
+        #   예) 감자 · 양파를 골랐으면 감자와 양파가 둘 다 들어간 레시피
+        #   SQL로 쓰면:
+        #     WHERE recipe_id IN (
+        #       SELECT recipe_id FROM recipe_ingredients
+        #       WHERE ing_id IN (감자, 양파)                 ← 고른 재료가 들어간 줄만
+        #       GROUP BY recipe_id                           ← 레시피별로 묶어서
+        #       HAVING COUNT(DISTINCT ing_id) = 2            ← 고른 재료 2개가 다 있는 레시피만
+        #     )
+        #   DISTINCT: 한 레시피에 같은 재료가 두 줄 있어도 한 번만 셈
+        if must_ing_ids:
+            has_all = (
+                select(RecipeIngredient.recipe_id)
+                .where(RecipeIngredient.ing_id.in_(must_ing_ids))
+                .group_by(RecipeIngredient.recipe_id)
+                .having(func.count(func.distinct(RecipeIngredient.ing_id)) == len(must_ing_ids))
+            )
+            stmt = stmt.where(Recipe.recipe_id.in_(has_all))
+
+        return stmt
+
+    # [수정 11/24 조현기] 검색 조건에 맞는 레시피 총 개수 (화면의 '검색 결과 N개', 전체 페이지 수 계산에 씀)
+    #   SQL로 쓰면: SELECT COUNT(*) FROM recipes WHERE (get_list와 같은 조건)
+    #   scalar_one(): 결과가 숫자 하나뿐이라 그 숫자만 꺼냄
+    #   [수정 11/24 조현기 2차] must_ing_ids를 넘기면 그 재료가 모두 들어간 레시피만 셈
+    @staticmethod
+    async def count_list(db: AsyncSession, search=None, must_ing_ids=None) -> int:
+        stmt = RecipeCrud.apply_filters(select(func.count()).select_from(Recipe), search, must_ing_ids)
+        result = await db.execute(stmt)
+        return result.scalar_one()
+
+    # 레시피 목록 조회
+    @staticmethod
+    async def get_list(
+        db: AsyncSession,
+        search=None,
+        limit: int | None = 20,
+        offset: int = 0,
+        sort: str = "latest",
+        must_ing_ids=None   # [수정 11/24 조현기 2차] 꼭 들어가야 하는 재료 (없으면 원래와 같음)
+    ) -> list[Recipe]:
+
+        #select(Recipe) : SELECT * FROM recipes;
+        # [수정 11/24 조현기] 원래 여기 있던 검색 조건 코드는 위 apply_filters로 옮김 (동작은 같음)
+        #   count_list도 같은 함수를 써서, 목록과 '총 개수'가 항상 같은 조건으로 계산됨
+        stmt = RecipeCrud.apply_filters(select(Recipe), search, must_ing_ids)
 
         # 정렬
         if sort == "popular":

@@ -5,8 +5,16 @@
 //   2. 게시글 목록 · 빈 목록 안내: 흰 둥근 카드(rounded-card · shadow-card)
 //   3. 빨강 · 파랑 글씨 → 시안 색(miss · have), 입력칸 포커스 테두리는 포인트색
 //   4. 회색(gray) 클래스는 그대로 둠 — index.css에서 따뜻한 회색으로 바뀌어 있음
+// [수정 11/24 조현기] (로딩) 불러오는 동안 '등록된 게시글이 없습니다'가 먼저 뜨던 문제 수정
+//   원인: posts가 처음에 빈 배열([])이라, 서버 응답이 오기 전까지 '게시글 0개'로 보고 빈 목록 안내를 그렸음
+//   해결: '지금 화면의 조건(정렬 · 검색)으로 받아 온 적이 있는지'를 기억해서, 아직이면 '불러오는 중'으로 봄
+//   - requestKey : 지금 조건을 글자 하나로 묶은 것 (예: '["latest","title",""]')
+//   - loadedKey  : 마지막으로 응답을 받은 조건 (+ 다시 불러오기 횟수). 처음엔 null
+//   - isLoading  : 둘이 다르면 true → 회색 자리 줄 5개(스켈레톤)
+//   화면 순서: 불러오는 중이면 회색 자리 → 실패면 오류 안내 + [다시 불러오기] → 0개면 빈 목록 안내 → 목록
+//   (setLoading(true)를 이펙트에서 부르지 않는 이유: 린트 오류 set-state-in-effect. 비교로 계산하면 필요 없음)
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react'; // [수정 11/24 조현기] 린트(no-unused-vars): 안 쓰는 React import 삭제 (React 17 이후 JSX에 React import 필요 없음)
 import { useNavigate } from 'react-router-dom';
 import { BOARD_SORT, BOARD_SEARCH_TYPES } from '../constants';
 import api from '../api'; 
@@ -55,6 +63,16 @@ export default function BoardListPage() {
     setActiveKeyword('');
   };
 
+  // [수정 11/24 조현기] (로딩) 위 맨 위 주석 참고
+  //   loadError   : 불러오기 실패 문구 ('' 이면 실패 아님)
+  //   reloadCount : [다시 불러오기]를 누를 때마다 1씩 늘림 → 조건이 같아도 다시 요청하게 하려고
+  //   응답을 받으면(성공이든 실패든) setLoadedKey(`${requestKey}#${reloadCount}`) → isLoading이 false가 됨
+  const requestKey = JSON.stringify([sortType, searchType, activeKeyword]);
+  const [loadedKey, setLoadedKey] = useState(null);
+  const [loadError, setLoadError] = useState('');
+  const [reloadCount, setReloadCount] = useState(0);
+  const isLoading = loadedKey !== `${requestKey}#${reloadCount}`;
+
   // 정렬·검색 조건이 바뀔 때 GET /posts 호출
   useEffect(() => {
     const controller = new AbortController();
@@ -69,14 +87,17 @@ export default function BoardListPage() {
       .get('/posts', { params, signal: controller.signal })
       .then(({ data }) => {
         setPosts(Array.isArray(data) ? data : []);
+        setLoadError('');
+        setLoadedKey(`${requestKey}#${reloadCount}`);
       })
       .catch((err) => {
         if (err.code === 'ERR_CANCELED') return;
-        
+        setLoadError('게시글을 불러오지 못했어요.');
+        setLoadedKey(`${requestKey}#${reloadCount}`);
       });
 
     return () => controller.abort();
-  }, [sortType, searchType, activeKeyword]);
+  }, [sortType, searchType, activeKeyword, requestKey, reloadCount]);
 
 
   return (
@@ -142,7 +163,27 @@ export default function BoardListPage() {
       </div>
 
       {/* 게시글 목록 영역 */}
-      {posts.length === 0 ? (
+      {isLoading ? (
+        // [수정 11/24 조현기] (로딩) 불러오는 동안 회색 자리 줄 5개 (animate-pulse: 깜빡이는 효과)
+        <div role="status" aria-label="게시글을 불러오는 중" className="divide-y divide-line rounded-card bg-surface px-4 shadow-card">
+          {Array.from({ length: 5 }, (_, i) => (
+            <div key={i} className="flex flex-col gap-2 py-5 animate-pulse" aria-hidden="true">
+              <div className="h-5 w-2/3 rounded-pill bg-gray-100" />
+              <div className="h-4 w-1/3 rounded-pill bg-gray-100" />
+            </div>
+          ))}
+        </div>
+      ) : loadError ? (
+        <div className="py-16 text-center rounded-card bg-surface shadow-card my-6">
+          <p role="alert" className="text-gray-500 font-medium mb-3">{loadError}</p>
+          <button
+            onClick={() => setReloadCount((n) => n + 1)}
+            className="px-4 py-2 bg-gray-200 text-gray-700 rounded-pill text-sm hover:bg-gray-300 transition-colors"
+          >
+            다시 불러오기
+          </button>
+        </div>
+      ) : posts.length === 0 ? (
         // 빈 화면 처리 (글이 없거나 검색 결과가 없을 때)
         <div className="py-16 text-center rounded-card bg-surface shadow-card my-6">
           {activeKeyword ? (

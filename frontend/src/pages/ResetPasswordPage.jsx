@@ -4,8 +4,11 @@
 //   2. 오류: 인라인 style(color: red) → 연한 빨간 상자, 안내 문구는 흐린 글씨
 //   3. 입력칸에 aria-label 추가 (라벨이 없어서 화면 읽기 프로그램이 이름을 몰랐음)
 // C:\Team-Be-happy-in-the-shade\frontend\src\pages\EmailAuthExample.jsx
+// [수정 11/24 조현기] 새 비밀번호 저장에 성공하면 '완료' 알림 → 로그인 화면으로 이동
+//   원래는 같은 화면에 성공 문구만 띄우고 인증 단계로 되돌아가서, 사용자가 직접 로그인 화면을 찾아가야 했음
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';   // [수정 11/24 조현기] useNavigate: 성공 후 로그인 화면으로 이동
+import Swal from 'sweetalert2';   // [수정 11/24 조현기] 성공 알림 (확인을 누르면 이동)
 
 import api from "../api";
 import { PASSWORD_MIN } from '../constants'; 
@@ -26,6 +29,7 @@ export default function ResetPasswordPage() {
 
   // 사용자 입력
   const [form, setForm] = useState({email: '', code: '', password: '', confirmPassword: ''});
+  const navigate = useNavigate();   // [수정 11/24 조현기]
  
   const [sentEmail, setSentEmail] = useState('');
   const [verifiedEmail, setVerifiedEmail] = useState('');
@@ -145,16 +149,11 @@ export default function ResetPasswordPage() {
         new_password: form.password,
       });
 
-      setMessage(data.message);
-      setStep('verify');
-      setSentEmail('');
-      setVerifiedEmail('');
-      setForm((prev) => ({
-        ...prev,
-        code: '',
-        password: '',
-        confirmPassword: '',
-      }));
+      // [수정 11/24 조현기] 원래: 성공 문구 표시 + 입력칸 비우고 인증 단계로 되돌림 (같은 화면에 머묾)
+      //   지금: 서버 문구("비밀번호를 바꿨습니다. 다시 로그인해 주세요.")를 알림으로 띄우고, 확인을 누르면 로그인 화면으로
+      //   replace: true → 뒤로 가기를 눌러도 비밀번호 찾기 화면으로 돌아오지 않게 (회원가입 성공 때와 같은 방식)
+      await Swal.fire('비밀번호 변경 완료', data.message, 'success');
+      navigate('/login', { replace: true });
     } catch (err) {
       setError(errorText(err));
     }

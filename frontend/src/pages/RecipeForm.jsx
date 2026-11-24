@@ -5,8 +5,20 @@
 //   3. 대표 사진 · 단계 사진: 점선 상자를 누르면 파일 선택 (파일 입력칸은 화면에서 숨기고 키보드로는 그대로 선택 가능)
 //   4. 난이도 · 종류 · 도구는 알약 버튼(고르면 검정), 추가한 재료는 초록 칩, 재료 검색 결과는 입력칸 아래 떠 있는 목록
 //   5. 단계 번호는 포인트색 동그라미, ↑ ↓ × 는 작은 동그라미 버튼 / 오류는 연한 빨간 상자
+// [수정 11/24 조현기] 가짜 데이터(mockData) → 실제 API 연결 (원래는 등록을 누르면 'DB 연결 후 제공 예정' 알림만 떴음)
+//   1) 재료 검색: mockIngredients(몇 개뿐) → GET /ingredients?keyword= (식재료 1,039개 + 별칭)
+//      → '계란'을 쳐도 '달걀'이 나옴 (내 냉장고 재료 추가와 같은 API). 입력하면 아래에 목록이 뜨는 모양은 그대로
+//   2) 조리도구: mockStandardTools → GET /fridge/tools/standard (DB의 조리도구 12개)
+//      DB(recipes.tool_id)에는 레시피당 도구가 하나만 저장돼서, 고르는 것도 하나만 (다시 누르면 해제)
+//   3) 사진: FileReader로 만든 긴 글자(data:…)는 DB 칸(500자)에 안 들어감
+//      → 고르는 즉시 서버에 올리고(api.js uploadImage → POST /images) 돌려받은 진짜 주소를 씀
+//   4) 등록 · 수정: POST /recipes (새 레시피) · PATCH /recipes/{id} (수정) → 성공하면 그 레시피 상세 화면으로
+//   입력칸 모양 · 검사 규칙 · 단계 이동은 원래 그대로
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';   // [수정 11/24 조현기] useEffect: 재료 검색 · 도구 목록 받기
+import { useNavigate } from 'react-router-dom';   // [수정 11/24 조현기] 저장 후 레시피 상세로 이동
+import Swal from 'sweetalert2';                    // [수정 11/24 조현기] 저장 완료 알림
+import api, { uploadImage } from '../api';         // [수정 11/24 조현기] 서버 요청 · 사진 올리기
 import {
   RECIPE_CATEGORIES,
   RECIPE_LEVELS,
@@ -17,20 +29,32 @@ import {
   IMAGE_MAX_MB,
 } from '../constants';
 
-import {
-  mockIngredients,
-  mockStandardTools,
-} from '../mockData';
+// [수정 11/24 조현기] mockIngredients · mockStandardTools import 삭제 (아래에서 API로 받음)
 
-
-
+// [수정 11/24 조현기] 재료 검색: 입력을 멈추고 이 시간(ms)이 지나면 서버에 물어봄
+//   글자 하나 칠 때마다 요청하지 않으려고 (내 냉장고 재료 검색과 같은 0.25초)
+const SEARCH_DELAY_MS = 250;
 
 function RecipeForm({ initialData = null }) {
 
-  // 데이터: API 연결 시 재료·도구 목록으로 교체
-  // 수정할 레시피는 부모 페이지에서 조회하여 initialData로 전달
-  const ingredients = mockIngredients;
-  const standardTools = mockStandardTools;
+  // 수정할 레시피는 부모 페이지(RecipeEditPage)에서 서버로 조회하여 initialData로 전달
+  // [수정 11/24 조현기] initialData가 있으면 '수정', 없으면 '새 레시피'
+  const navigate = useNavigate();
+
+  // [수정 11/24 조현기] 조리도구 목록: 원래 mockStandardTools → 서버에서 받음 (처음 한 번)
+  const [standardTools, setStandardTools] = useState([]);
+  useEffect(() => {
+    const controller = new AbortController();
+    api.get('/fridge/tools/standard', { signal: controller.signal })
+      .then(({ data }) => setStandardTools(data))
+      .catch(() => {});   // 실패하면 도구 칸이 비어 보임 (저장할 때 '도구를 골라 주세요' 안내가 뜸)
+    return () => controller.abort();
+  }, []);
+
+  // [수정 11/24 조현기] 사진 올리는 중이면 true → 그동안 등록 버튼 잠금 · '사진 올리는 중' 표시
+  const [isUploading, setIsUploading] = useState(false);
+  // [수정 11/24 조현기] 저장(등록 · 수정) 요청 중이면 true → 두 번 눌러 두 번 저장되는 것 막기
+  const [isSaving, setIsSaving] = useState(false);
 
   // 입력 상태·검증·미리보기는 DB와 관계없이 사용
   const [form, setForm] = useState(() => ({
@@ -66,13 +90,28 @@ function RecipeForm({ initialData = null }) {
   // 도구 더보기
   const [showAllTools, setShowAllTools] = useState(false);
 
-  const keyword = ingredientKeyword.trim().toLowerCase();
+  const keyword = ingredientKeyword.trim();
 
   // 검색어에 맞는 재료 목록
-  const ingredientResults = keyword
-    ? ingredients.filter((ingredient) =>
-        ingredient.ing_name.toLowerCase().includes(keyword)
-      ) : [];
+  // [수정 11/24 조현기] 원래: mockIngredients에서 이름에 검색어가 들어간 것만 (별칭 검색 없음 → '계란'은 0개)
+  //   지금: GET /ingredients?keyword=검색어 (이름 + 별칭, 정확히 같은 이름이 맨 위)
+  //   - 입력을 멈추고 0.25초 뒤에 요청 (setTimeout), 그 전에 또 입력하면 이전 요청은 취소
+  //   - 재료를 이미 골랐으면(selectedIngredient) 검색하지 않음 (입력칸에 고른 이름이 채워져 있어서)
+  //   - 검색어가 비면 요청하지 않고, 아래 화면도 목록을 그리지 않음
+  const [ingredientResults, setIngredientResults] = useState([]);
+  const [isSearchingIngredient, setIsSearchingIngredient] = useState(false);
+  useEffect(() => {
+    if (!keyword || selectedIngredient) return;
+    const controller = new AbortController();
+    const timer = setTimeout(() => {
+      setIsSearchingIngredient(true);
+      api.get('/ingredients', { params: { keyword }, signal: controller.signal })
+        .then(({ data }) => setIngredientResults(data))
+        .catch((err) => { if (err.code !== 'ERR_CANCELED') setIngredientResults([]); })
+        .finally(() => { if (!controller.signal.aborted) setIsSearchingIngredient(false); });
+    }, SEARCH_DELAY_MS);
+    return () => { clearTimeout(timer); controller.abort(); };
+  }, [keyword, selectedIngredient]);
 
   // 일반 필드 변경
   const update = (field, value) => {
@@ -175,7 +214,11 @@ function RecipeForm({ initialData = null }) {
   };
 
   // 이미지 검증 및 미리보기
-  const readImage = (file, callback) => {
+  // [수정 11/24 조현기] 검사는 그대로, 그다음이 바뀜
+  //   원래: FileReader로 사진을 긴 글자(data:image/jpeg;base64,…)로 바꿔서 미리보기 → 이 글자를 DB에 저장할 수 없었음
+  //   지금: 서버에 올리고(uploadImage) 돌려받은 진짜 주소로 미리보기 · 저장 (callback(주소, 파일))
+  //   async: 올리는 동안 기다려야 해서. 올리는 중에는 isUploading = true
+  const readImage = async (file, callback) => {
     if (!file) return;
 
     if (!IMAGE_TYPES.includes(file.type)) {
@@ -188,18 +231,17 @@ function RecipeForm({ initialData = null }) {
       return;
     }
 
-    const reader = new FileReader();
-
-    reader.onload = () => {
-      callback(reader.result, file);
+    setIsUploading(true);
+    try {
+      const url = await uploadImage(file);
+      callback(url, file);
       setError('');
-    };
-
-    reader.onerror = () => {
-      setError('사진을 읽지 못했습니다.');
-    };
-
-    reader.readAsDataURL(file);
+    } catch (err) {
+      const detail = err.response?.data?.detail;
+      setError(typeof detail === 'string' ? detail : '사진을 올리지 못했습니다. 잠시 후 다시 시도해 주세요.');
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   // 단계별 이미지 변경
@@ -231,9 +273,11 @@ function RecipeForm({ initialData = null }) {
     });
   };
 
-  // DB연결 후: 입력 검증 후 실제 등록·수정은 API 연결 시 구현
-  const submit = (event) => {
+  // 입력 검증 후 등록 · 수정
+  // [수정 11/24 조현기] 원래: 검사만 하고 'DB 연결 후 제공될 예정입니다' 알림 → 지금: 실제로 서버에 저장
+  const submit = async (event) => {
     event.preventDefault();
+    if (isSaving || isUploading) return;   // [수정 11/24 조현기] 저장 중 · 사진 올리는 중에는 무시
 
     const invalid =
       !form.recipe_title.trim() ||
@@ -262,8 +306,49 @@ function RecipeForm({ initialData = null }) {
     }
 
     setError('');
-    // DB연결 후 이미지 업로드, 전송 데이터 정리, 등록·수정 API 요청 및 성공·실패 처리
-    window.alert(`레시피 ${initialData ? '수정' : '등록'} 기능은 DB 연결 후 제공될 예정입니다.`);
+
+    // [수정 11/24 조현기] 서버(RecipeCreate · RecipeUpdate)가 받는 모양으로 정리
+    //   - 이름은 DB 컬럼 그대로 (recipe_title, intro, image_url, servings, tool_id, level, cooking_time, r_category_id)
+    //   - 숫자 칸은 Number(): 입력칸 값은 글자("15")라서 숫자(15)로
+    //   - intro가 비었으면 null (빈 글자는 저장하지 않음 — 와이어프레임 '빈 글자(null) 저장 안 함')
+    //   - tool_id: 고른 도구 하나 (DB에 하나만 저장)
+    //   - steps: 화면 순서대로 step_no 1, 2, 3 … 을 새로 매김 (↑ ↓로 순서를 바꿨어도 맞게)
+    const payload = {
+      recipe_title: form.recipe_title.trim(),
+      intro: form.intro.trim() || null,
+      image_url: form.main_image_url,
+      servings: Number(form.servings),
+      tool_id: form.tool_ids.length ? Number(form.tool_ids[0]) : null,
+      level: form.level,
+      cooking_time: Number(form.cooking_time),
+      r_category_id: Number(form.r_category_id),
+      ingredients: form.ingredients.map((item) => ({
+        ing_id: Number(item.ing_id),
+        amount_text: item.amount_text.trim(),
+      })),
+      steps: form.steps.map((step, index) => ({
+        step_no: index + 1,
+        step_content: step.step_content.trim(),
+        step_image_url: step.step_image_url || null,
+      })),
+    };
+
+    // [수정 11/24 조현기] 수정이면 PATCH /recipes/{id}, 새 레시피면 POST /recipes
+    //   성공하면 서버가 저장된 레시피 상세(RecipeDetail)를 돌려줌 → 알림 후 그 레시피 상세 화면으로
+    //   실패하면 서버가 준 문장(예: '본인 레시피만 수정할 수 있습니다.')을 빨간 상자에
+    setIsSaving(true);
+    try {
+      const { data } = initialData
+        ? await api.patch(`/recipes/${initialData.recipe_id}`, payload)
+        : await api.post('/recipes', payload);
+      await Swal.fire(initialData ? '레시피를 수정했어요' : '레시피를 등록했어요', '', 'success');
+      navigate(`/recipes/${data.recipe_id}`);
+    } catch (err) {
+      const detail = err.response?.data?.detail;
+      setError(typeof detail === 'string' ? detail : `레시피 ${initialData ? '수정' : '등록'}에 실패했습니다. 입력한 값을 다시 확인해 주세요.`);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   // 표시할 도구 목록
@@ -393,10 +478,13 @@ function RecipeForm({ initialData = null }) {
             />
 
             {/* 검색 결과 */}
-            {keyword && (
+            {/* [수정 11/24 조현기] 재료를 고른 뒤에는 목록을 닫음 (!selectedIngredient). 받는 중이면 '검색 중...' */}
+            {keyword && !selectedIngredient && (
               <div className="absolute inset-x-0 top-full z-10 mt-1 flex max-h-64 flex-col overflow-y-auto rounded-[16px] bg-surface py-2 shadow-card ring-1 ring-line">
 
-                {ingredientResults.length ? (
+                {isSearchingIngredient && ingredientResults.length === 0 ? (
+                  <p className="px-4 py-2 text-sm text-muted">검색 중...</p>
+                ) : ingredientResults.length ? (
                   ingredientResults.map((ingredient) => {
 
                     const selected = form.ingredients.some(
@@ -438,13 +526,8 @@ function RecipeForm({ initialData = null }) {
           {form.ingredients.map((item, index) => (
             <div className="inline-flex items-center gap-2 rounded-pill bg-have-soft py-1 pl-4 pr-1" key={item.ing_id}>
               <span className="font-bold text-have">
-                {item.ing_name ??
-                  ingredients.find(
-                    (ingredient) =>
-                      Number(ingredient.ing_id) ===
-                      Number(item.ing_id)
-                  )?.ing_name ??
-                  '재료'}
+                {/* [수정 11/24 조현기] mock 목록에서 이름을 찾던 부분 삭제: 추가할 때 · 수정 화면에서 받을 때 이름이 같이 들어 있음 */}
+                {item.ing_name ?? '재료'}
               </span>
               <input aria-label="선택한 재료 분량 수정" className="h-8 w-24 rounded-pill border-0 px-3 text-sm" value={item.amount_text}
                 onChange={(e) => updateIngredient(index, 'amount_text', e.target.value)}
@@ -461,7 +544,8 @@ function RecipeForm({ initialData = null }) {
 
       {/* ===== 5. 조리 도구 ===== */}
       <section className="rounded-card bg-surface p-6 shadow-card md:p-8 flex flex-col gap-4">
-        <h3 className="text-xl font-black">필요한 도구 *</h3>
+        {/* [수정 11/24 조현기] DB에 레시피당 도구 하나만 저장돼서 하나만 고르게 (여러 개를 골라도 첫 번째만 저장됐음) */}
+        <h3 className="text-xl font-black">필요한 도구 * <span className="text-sm font-normal text-muted">(하나 선택)</span></h3>
         <div className="flex flex-wrap gap-2">
 
           {visibleTools.map((tool) => (
@@ -470,12 +554,9 @@ function RecipeForm({ initialData = null }) {
               onClick={() => {
                 const selected = form.tool_ids.map(Number).includes(Number(tool.tool_id));
 
-                const updated = selected
-                  ? form.tool_ids.filter(
-                      (id) =>
-                        Number(id) !== Number(tool.tool_id)
-                    )
-                  : [...form.tool_ids, Number(tool.tool_id),];
+                // [수정 11/24 조현기] 하나만: 고른 도구를 다시 누르면 해제([]), 다른 도구를 누르면 그것만([id])
+                //   (원래는 여러 개를 쌓았음. tool_ids를 배열로 둔 건 다른 코드를 덜 바꾸려고 그대로)
+                const updated = selected ? [] : [Number(tool.tool_id)];
 
                 update('tool_ids', updated);
               }}
@@ -562,8 +643,9 @@ function RecipeForm({ initialData = null }) {
           <button type="button" className="h-12 rounded-pill bg-gray-100 px-6 font-medium hover:bg-gray-200" onClick={() => window.history.back()}>
             취소
           </button>
-          <button type="submit" className="h-12 rounded-pill bg-accent px-6 font-bold text-white hover:bg-accent-dark">
-            {initialData ? '레시피 수정' : '레시피 등록'}
+          {/* [수정 11/24 조현기] 사진 올리는 중 · 저장 중에는 잠그고 글자도 바꿈 */}
+          <button type="submit" disabled={isUploading || isSaving} className="h-12 rounded-pill bg-accent px-6 font-bold text-white hover:bg-accent-dark disabled:opacity-40">
+            {isUploading ? '사진 올리는 중...' : isSaving ? '저장 중...' : initialData ? '레시피 수정' : '레시피 등록'}
           </button>
         </div>
       </div>

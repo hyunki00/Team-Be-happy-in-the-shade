@@ -6,6 +6,7 @@
 
 //recipe 컴포넌트 재사용해 출력하게한다
 import { Link } from 'react-router-dom';
+import { thumbUrl, fallbackToOriginal } from '../../api';   // [11/24 조현기] 레시피 사진 썸네일
 
 function MyRecipeList({
   recipes, title = '내 레시피', emptyMessage = '작성한 레시피가 없습니다.',
@@ -25,7 +26,10 @@ function MyRecipeList({
           {recipes.map((recipe) => (
             <li key={recipe.recipe_id} className="flex flex-wrap items-center gap-4 py-4">
               <Link to={`/recipes/${recipe.recipe_id}`} className="flex min-w-0 flex-1 items-center gap-4 hover:text-accent">
-                <img src={recipe.main_image_url ?? recipe.image_url}
+                {/* [11/24 조현기] 큰 원본 대신 썸네일 (없으면 원본으로 자동 교체) */}
+                <img src={thumbUrl(recipe.recipe_id, recipe.main_image_url ?? recipe.image_url)}
+                  onError={(e) => fallbackToOriginal(e, recipe.main_image_url ?? recipe.image_url)}
+                  loading="lazy"
                   alt={recipe.recipe_title} className="h-20 w-20 flex-none rounded-[18px] object-cover bg-photo"
                 />
                 <span className="truncate font-bold">{recipe.recipe_title}</span>

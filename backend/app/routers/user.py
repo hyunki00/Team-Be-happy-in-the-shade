@@ -1,4 +1,4 @@
-﻿# 담당: 오효정
+# 담당: 오효정
 # 할 일: prefix="/users"
 #   PATCH /users/me
 #   GET /users/me/recipes · /me/posts · /me/liked-recipes · /me/bookmarked-recipes · /me/liked-posts · /me/post-comments
@@ -29,6 +29,7 @@ from app.db.crud.post import PostCrud
 from app.db.scheme.posts import PostListItem, MyPostCommentRead
 
 from app.services.recipe import RecipeService
+from app.db.crud.home import HomeCrud   # [수정 11/24 조현기] 내 조리도구 조회 (마이페이지 레시피 카드의 '내 도구로 가능' 표시)
 from app.services.post import PostService
 from app.services.user import UserService
 
@@ -63,34 +64,34 @@ async def check_login_id(login_id: str, db: AsyncSession = Depends(get_db)):
 @router.get("/me/recipes", response_model=list[RecipeListItem])
 async def get_my_recipes(user_id: int = Depends(get_user_id), db: AsyncSession = Depends(get_db),):
     recipes = await RecipeCrud.get_by_user(db, user_id)
-    recipe_ids = {recipe.recipe_id for recipe in recipes}
-    if not recipe_ids:
-        return []
-
-    items = await RecipeService.search(db, RecipeSearch(), limit=1000)
-    return [item for item in items if item.recipe_id in recipe_ids]
+    # [수정 11/24 조현기] 속도 개선 (약 3초 → 0.01초 안팎)
+    #   원래: 전체 레시피(최대 1000개)를 검색 함수로 전부 카드로 만든 뒤, 그중 내 것만 골라냄
+    #   지금: 위에서 crud가 찾은 '내 레시피'만 카드로 만듦 (build_list_items, services/recipe.py)
+    #   순서는 crud가 정한 그대로 (내 레시피: 최신순 / 좋아요 · 북마크: 누른 최신순)
+    #   HomeCrud.get_my_tool_ids: 내 조리도구 → 카드의 '내 도구로 가능' 표시
+    return await RecipeService.build_list_items(db, recipes, await HomeCrud.get_my_tool_ids(db, user_id))
 
 # 좋아요한 레시피 조회
 @router.get("/me/liked-recipes", response_model=list[RecipeListItem])
 async def get_my_liked_recipes(user_id: int = Depends(get_user_id), db: AsyncSession = Depends(get_db)):
     recipes = await RecipeCrud.get_liked_by_user(db, user_id)
-    recipe_ids = {recipe.recipe_id for recipe in recipes}
-    if not recipe_ids:
-        return []
-
-    items = await RecipeService.search(db, RecipeSearch(), limit=1000)
-    return [item for item in items if item.recipe_id in recipe_ids]
+    # [수정 11/24 조현기] 속도 개선 (약 3초 → 0.01초 안팎)
+    #   원래: 전체 레시피(최대 1000개)를 검색 함수로 전부 카드로 만든 뒤, 그중 내 것만 골라냄
+    #   지금: 위에서 crud가 찾은 '내 레시피'만 카드로 만듦 (build_list_items, services/recipe.py)
+    #   순서는 crud가 정한 그대로 (내 레시피: 최신순 / 좋아요 · 북마크: 누른 최신순)
+    #   HomeCrud.get_my_tool_ids: 내 조리도구 → 카드의 '내 도구로 가능' 표시
+    return await RecipeService.build_list_items(db, recipes, await HomeCrud.get_my_tool_ids(db, user_id))
 
 # 북마크한 레시피 조회
 @router.get("/me/bookmarked-recipes", response_model=list[RecipeListItem])
 async def get_my_bookmarked_recipes(user_id: int = Depends(get_user_id), db: AsyncSession = Depends(get_db)):
     recipes = await RecipeCrud.get_bookmarked_by_user(db, user_id)
-    recipe_ids = {recipe.recipe_id for recipe in recipes}
-    if not recipe_ids:
-        return []
-
-    items = await RecipeService.search(db, RecipeSearch(), limit=1000)
-    return [item for item in items if item.recipe_id in recipe_ids]
+    # [수정 11/24 조현기] 속도 개선 (약 3초 → 0.01초 안팎)
+    #   원래: 전체 레시피(최대 1000개)를 검색 함수로 전부 카드로 만든 뒤, 그중 내 것만 골라냄
+    #   지금: 위에서 crud가 찾은 '내 레시피'만 카드로 만듦 (build_list_items, services/recipe.py)
+    #   순서는 crud가 정한 그대로 (내 레시피: 최신순 / 좋아요 · 북마크: 누른 최신순)
+    #   HomeCrud.get_my_tool_ids: 내 조리도구 → 카드의 '내 도구로 가능' 표시
+    return await RecipeService.build_list_items(db, recipes, await HomeCrud.get_my_tool_ids(db, user_id))
 
 # 내 게시글 조회
 @router.get("/me/posts", response_model=list[PostListItem])

@@ -11,7 +11,7 @@
 # - DB 세션: db: AsyncSession = Depends(get_db)  (app/db/database.py)
 # - 만든 뒤 http://localhost:8044/docs 에서 바로 눌러 보며 확인
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Literal
 
@@ -34,8 +34,15 @@ async def get_recipe_recommendations(
     return await RecipeService.recommend(db, user_id)
 
 # 1. 레시피 목록 / 검색
+# [수정 11/24 조현기] 검색 결과 '총 개수'를 응답 헤더 X-Total-Count로 같이 보냄
+#   왜 헤더로? 응답 본문을 {total, recipes}로 바꾸면 /recipes를 쓰는 다른 화면(메인 인기 · 새 레시피,
+#     게시글 쓰기의 레시피 찾기)도 전부 고쳐야 함. 헤더에 따로 실어 보내면 본문(레시피 목록)은 그대로라 안 고쳐도 됨
+#   헤더란? 응답에 붙는 '추가 정보 칸'. 개발자 도구 → Network → 요청 → Headers에서 볼 수 있음
+#   화면에서 읽기: Number(response.headers["x-total-count"])  (axios는 헤더 이름을 소문자로 바꿔 줌)
+#   ※ 브라우저가 이 헤더를 읽게 하려면 main.py CORS에 expose_headers=["X-Total-Count"]가 필요 (추가해 둠)
 @router.get("", response_model=list[RecipeListItem])
 async def get_recipes(
+    response: Response,
     keyword: str | None = None,
     r_category_id: int | None = None,
     level: str | None = None,
@@ -61,9 +68,13 @@ async def get_recipes(
     )
 
     # 검색 조건에 맞는 레시피 목록을 서비스에서 조회
-    return await RecipeService.search(
+    # [수정 11/24 조현기] search → search_page: (이번 페이지 목록, 전체 개수) 두 값을 같이 받음
+    #   response: FastAPI가 넘겨주는 '보낼 응답' 객체. 여기에 헤더를 적으면 응답에 같이 실림
+    items, total = await RecipeService.search_page(
         db, search, user_id, limit, offset, sort=sort
     )
+    response.headers["X-Total-Count"] = str(total)   # 헤더 값은 글자여야 해서 str()
+    return items
 
 
 # 2. 레시피 상세

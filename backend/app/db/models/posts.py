@@ -1,4 +1,7 @@
 # 담당: 임유빈
+# [수정 11/24 조현기] Post에 recipe_id(관련 레시피) 추가
+#   게시글 쓰기 화면에서 '관련 레시피'를 골라도 DB에 저장할 칸이 없어서 사라지던 문제
+#   DB에도 같은 칸이 있어야 함 → 3_DB수정_중복삭제_게시글레시피연결.sql (팀원 전원 한 번 실행)
 # 할 일:
 #   Post        → posts          post_id, user_id, title, content, created_at
 #   PostImage   → post_images    p_image_id, post_id, p_image_url, p_image_order
@@ -26,6 +29,11 @@ class Post(Base):
     user_id: Mapped[int] = mapped_column(nullable=False)
     title: Mapped[str] = mapped_column(String(100), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
+    # [수정 11/24 조현기] 관련 레시피 번호 (recipes.recipe_id)
+    #   - 비워 둘 수 있음(nullable=True): 레시피를 연결하지 않은 글은 NULL
+    #   - 연결한 레시피가 삭제되면 DB가 자동으로 NULL로 바꿈 (SQL의 ON DELETE SET NULL) → 글은 남음
+    #   - DB에 이 칸이 없으면 게시판 조회가 전부 500 오류 → 3_DB수정_중복삭제_게시글레시피연결.sql을 먼저 실행
+    recipe_id: Mapped[Optional[int]] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
 
     # relationship 추가해 주어야 Pydantic스키마가 images를 빼갈 수 있습니다!

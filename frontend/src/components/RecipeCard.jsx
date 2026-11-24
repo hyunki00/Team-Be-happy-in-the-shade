@@ -4,7 +4,12 @@
 //   2. 사진을 카드 위에 꽉 차게 (4:3), 사진 주소가 없으면 빈 자리 색을 보여 줌
 //   3. 조리 시간 · 난이도 · 작성자를 한 줄로, 일치율은 막대 + 숫자, 부족한 재료는 연한 빨간 칩으로
 //   4. 마우스를 올렸을 때 움직임은 위치(transform)만 바뀌게 (빠른 스크롤 때 글자가 카드 밖으로 튀어 보이는 문제 줄임)
+// [11/24 조현기] 사진 로딩 속도: 큰 원본 대신 썸네일(가로 480px WebP, 장당 수십 KB)을 먼저 받음
+//   - thumbUrl: 썸네일 주소 규칙 (api.js). 썸네일 파일이 없으면 onError에서 원본으로 자동 교체(fallbackToOriginal)
+//   - loading="lazy": 화면에 보이기 직전에 받음 (아래쪽 카드는 스크롤할 때) · decoding="async": 그리는 동안 화면이 멈추지 않게
+//   받는 값 · 보여 주는 내용 · 모양은 그대로
 import { Link } from "react-router-dom";
+import { thumbUrl, fallbackToOriginal } from "../api";
 
 //recipe : 부모 컴포넌트(RecipeListPage.jsx)가 전달하는 레시피 한 개
 //showMatch=false : 일치율 표시 여부의 기본값
@@ -17,7 +22,10 @@ function RecipeCard({recipe, showMatch=false}) {
     >
       {recipe.image_url ? (
         <img
-          src={recipe.image_url}
+          src={thumbUrl(recipe.recipe_id, recipe.image_url)}
+          onError={(e) => fallbackToOriginal(e, recipe.image_url)}
+          loading="lazy"
+          decoding="async"
           alt={recipe.recipe_title}
           className="aspect-[4/3] w-full object-cover bg-photo"
         />

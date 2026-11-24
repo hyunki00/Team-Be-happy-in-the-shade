@@ -11,6 +11,8 @@ venv/
 .venv/
 __pycache__/
 *.pyc
+# [11/24 조현기] 올린 사진 파일 (PC마다 따로, GitHub에 올리지 않음)
+backend/uploads/
 
 # 에디터 · OS
 .vscode/

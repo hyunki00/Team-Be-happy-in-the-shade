@@ -11,3 +11,10 @@ from app.db.scheme.recipes import RecipeListItem
 class HomeRecommendRead(BaseModel):
     total: int = 0
     recipes: list[RecipeListItem] = Field(default_factory=list)
+
+
+# [11/24 조현기] 첫 배너 오른쪽 음식 사진 한 장
+#   장식용이라 사진 주소만 있으면 됨. recipe_id는 화면에서 목록 key(겹치지 않는 번호)로 씀
+class HeroImageRead(BaseModel):
+    recipe_id: int
+    image_url: str

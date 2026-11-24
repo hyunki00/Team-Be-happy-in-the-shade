@@ -1,4 +1,12 @@
 // 담당: 임유빈
+// [수정 11/24 조현기] 이 파일에서 바뀐 곳 (자세한 건 코드 안 [수정 11/24] 주석)
+//   1) 관련 레시피 저장: 고른 레시피 번호(recipe_id)를 같이 보냄 (원래는 화면에서만 고르고 저장 안 됨)
+//      백엔드 posts 테이블에 recipe_id 칸이 생김 → 3_DB수정_중복삭제_게시글레시피연결.sql
+//   2) blob: 사진 주소를 DB에 보내지 않음 (2차부터는 5)처럼 진짜 주소로 올라가서 blob:이 생기지 않음. 혹시 남은 것만 거름)
+//   3) 수정 화면: 글을 불러오는 동안 빈 폼 대신 '불러오는 중...' (만들어만 두고 안 쓰던 isLoadingPost 사용)
+//   4) 린트 오류 5개: 안 쓰는 React import · err, 이펙트 안 setState
+//   5) [2차] 사진 저장: 사진을 고르는 즉시 서버(POST /images)에 올리고, 돌려받은 진짜 주소를 images에 넣음
+//      → 다시 열어도 사진이 깨지지 않음 (원래는 blob: 임시 주소라 창을 닫으면 깨졌음)
 // 커뮤니티 게시물 작성 페이지 [아직 수정중]
 // [디자인 11/22 조현기] 시안 F 적용 — className(모양)만 바꿈, 작성 · 사진 · 레시피 연결 로직은 그대로
 //   1. 작성 폼 · 레시피 검색 창: 흰 둥근 카드(rounded-card · shadow-card)
@@ -6,9 +14,9 @@
 //   3. 필수(*) · 연결 해제 글씨: 빨강 → 시안 색(miss), 입력칸 포커스 테두리는 포인트색
 //   4. 회색(gray) 클래스는 그대로 둠 — index.css에서 따뜻한 회색으로 바뀌어 있음
 // 후기작성 경로 [아직 수정/작성중..]
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react'; // [수정 11/24 조현기] 린트: 안 쓰는 React import 삭제 (React 17 이후 JSX에 필요 없음)
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import api from '../api'; 
+import api, { uploadImage } from '../api';   // [수정 11/24 조현기 2차] uploadImage: 사진 올리기 (api.js)
 import { BOARD_TITLE_MAX, BOARD_CONTENT_MAX, BOARD_IMAGE_MAX_COUNT, IMAGE_MAX_MB } from '../constants';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -33,6 +41,7 @@ export default function BoardFormPage() {
   
   const [isLoadingPost, setIsLoadingPost] = useState(isEditMode);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);   // [수정 11/24 조현기 2차] 사진 올리는 중이면 true (그동안 등록 버튼 잠금)
 
 useEffect(() => {
   if (isEditMode) {
@@ -41,10 +50,15 @@ useEffect(() => {
     api
       .get(`/posts/${id}`, { signal: controller.signal })
       .then(({ data }) => {
+        // [수정 11/24 조현기] 글을 다 받았으면 '불러오는 중' 끝 → 폼을 보여 줌
+        //   isLoadingPost는 원래 만들어만 두고 안 쓰던 값 (린트 오류). 수정 화면이면 true로 시작함
+        setIsLoadingPost(false);
         setTitle(data.title || '');
         setContent(data.content || '');
+        // [수정 11/24 조현기] 예전에 잘못 저장된 blob: 주소는 빼고 불러옴
+        //   (이 수정 전에 쓴 글은 blob: 주소가 DB에 들어가 있을 수 있음. 다시 열면 깨진 사진이라 보여 줄 수 없음)
         const loadedImages = Array.isArray(data.images)
-          ? data.images.map((img) => (typeof img === 'string' ? img : img.image_url)).filter(Boolean)
+          ? data.images.map((img) => (typeof img === 'string' ? img : img.image_url)).filter((url) => url && !url.startsWith('blob:'))
           : [];
 
         setImages(loadedImages);
@@ -61,18 +75,36 @@ useEffect(() => {
   }
 }, [id, isEditMode, navigate]);
 
-const isValid = title.trim() !== '' && content.trim() !== '' && !isSubmitting;
+// [수정 11/24 조현기 2차] 사진을 올리는 중에도 등록 못 하게 (!isUploading) — 다 올라가기 전에 저장하면 사진이 빠짐
+const isValid = title.trim() !== '' && content.trim() !== '' && !isSubmitting && !isUploading;
 
   // 이미지 추가 핸들러 (최대 5장 제한(가안))
-  const handleImageChange = (e) => {
+  // [수정 11/24 조현기 2차] 사진을 고르면 바로 서버에 올림
+  //   원래: URL.createObjectURL(file)로 만든 blob: 임시 주소를 images에 넣음 → 저장 후 다시 열면 깨진 사진
+  //   지금: uploadImage(file)로 한 장씩 올리고, 서버가 돌려준 진짜 주소(http://localhost:8044/uploads/…)를 넣음
+  //   - async: 서버 응답을 기다려야 해서. 올리는 동안 '사진 올리는 중...' + 등록 버튼 잠금
+  //   - 여러 장을 고르면 차례대로 올림. 중간에 실패하면 거기까지 올린 사진은 남기고 알림
+  //   - e.target.value = '': 같은 사진을 지웠다가 다시 골라도 onChange가 다시 불리게 입력칸을 비움
+  const handleImageChange = async (e) => {
     const files = Array.from(e.target.files);
+    e.target.value = '';
     if (images.length + files.length > BOARD_IMAGE_MAX_COUNT) {
       alert(`사진은 최대 ${BOARD_IMAGE_MAX_COUNT}장까지 업로드할 수 있습니다.`);
       return;
     }
 
-    const newImageUrls = files.map((file) => URL.createObjectURL(file));
-    setImages((prev) => [...prev, ...newImageUrls]);
+    setIsUploading(true);
+    try {
+      for (const file of files) {
+        const url = await uploadImage(file);
+        setImages((prev) => [...prev, url]);
+      }
+    } catch (err) {
+      const detail = err.response?.data?.detail;
+      alert(typeof detail === 'string' ? detail : '사진을 올리지 못했습니다. 잠시 후 다시 시도해 주세요.');
+    } finally {
+      setIsUploading(false);
+    }
   };
   
   // 이미지 삭제
@@ -101,10 +133,18 @@ const isValid = title.trim() !== '' && content.trim() !== '' && !isSubmitting;
 
     setIsSubmitting(true);
     try {
+      // [수정 11/24 조현기] 사진 주소 중 blob:으로 시작하는 것은 보내지 않음
+      //   blob: 주소란? 사진을 고르면 URL.createObjectURL(file)이 만드는 '미리보기용 임시 주소'
+      //     (blob:http://localhost:5173/…). 이 브라우저 · 이 창에서만 보이고, DB에 저장하면 다른 사람에겐 깨진 사진
+      //   → 서버에는 blob:이 아닌 주소만 보냄
+      //   [2차] 이제는 사진을 고를 때 바로 서버에 올려서(handleImageChange) images에 진짜 주소만 들어감
+      //         이 거르기는 혹시 남은 blob: 주소를 막는 안전장치
+      //   recipe_id: 고른 관련 레시피 번호. 안 골랐거나 ✕로 뺐으면 null → 서버가 연결을 비움
       const payload = {
         title: title.trim(),
         content: content.trim(),
-        images,
+        images: images.filter((url) => !url.startsWith('blob:')),
+        recipe_id: linkedRecipe?.recipe_id ?? null,   // [수정 11/24 조현기] 관련 레시피 번호 (?. : linkedRecipe가 null이어도 오류 없이 undefined → ?? null)
       };
 
       const { data } = isEditMode
@@ -114,13 +154,19 @@ const isValid = title.trim() !== '' && content.trim() !== '' && !isSubmitting;
       alert(isEditMode ? '수정이 완료되었습니다.' : '게시글이 등록되었습니다.');
       navigate(`/board/${data.post_id}`);
 
-    } catch (err) {
+    } catch {   // [수정 11/24 조현기] 린트(no-unused-vars): catch (err)의 err를 안 써서 삭제
       alert(isEditMode ? '게시글 수정에 실패했습니다.' : '게시글 등록에 실패했습니다.');
 
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  // [수정 11/24 조현기] 수정 화면: 글을 불러오는 동안 빈 폼 대신 안내
+  //   원래는 빈 폼이 먼저 보였다가 제목 · 내용이 뒤늦게 채워졌음. 새 글 쓰기는 isLoadingPost가 처음부터 false라 바로 폼
+  if (isLoadingPost) {
+    return <p role="status" className="max-w-3xl mx-auto py-16 text-center text-muted">게시글을 불러오는 중...</p>;
+  }
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-8 relative">
@@ -190,6 +236,10 @@ const isValid = title.trim() !== '' && content.trim() !== '' && !isSubmitting;
               </div>
             ))}
 
+            {/* [수정 11/24 조현기 2차] 사진을 올리는 동안 안내 (원래 있던 '미리보기만 돼요' 안내는 사진이 저장되니 뺌) */}
+            {isUploading && (
+              <p role="status" className="basis-full text-xs text-muted">사진 올리는 중...</p>
+            )}
             {images.length < BOARD_IMAGE_MAX_COUNT && (
               <label className="w-20 h-20 border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-gray-400 transition-colors bg-gray-50 text-gray-500">
                 <span className="text-xl">+</span>
@@ -283,8 +333,10 @@ function RecipeSearchModal({ onClose, onSelect }) {
 
   useEffect(() => {
     const trimmed = searchTerm.trim();
+    // [수정 11/24 조현기] 린트(set-state-in-effect): 이펙트 안에서 바로 setResults([]) 하던 줄 삭제
+    //   검색어가 비어 있으면 아래 화면이 결과 목록 대신 '검색어를 입력하면…' 안내를 보여 줌
+    //   → results에 예전 결과가 남아 있어도 화면에 안 나오므로 비울 필요가 없음
     if (!trimmed) {
-      setResults([]);
       return;
     }
 

@@ -8,11 +8,13 @@
 #       순서   = 일치율 높은 순 → 같으면 내 조리도구로 가능한 것 먼저 → 최신 레시피 먼저
 #   - 다른 점은 속도: 레시피마다 DB에 묻지 않고 표 단위로 한 번씩만 가져와서 계산 (3.4초 → 0.1초 안팎)
 #   - 카드 정보(작성자 · 좋아요 수 · 부족한 재료 …)는 화면에 보여 줄 몇 개만 가져온다
+#
+# hero_images: 첫 배너 오른쪽에 깔 음식 사진 무작위 몇 장 (11/24, 맨 아래)
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.settings import settings
 from app.db.crud.home import HomeCrud
-from app.db.scheme.home import HomeRecommendRead
+from app.db.scheme.home import HeroImageRead, HomeRecommendRead
 from app.db.scheme.recipes import RecipeListItem
 
 
@@ -81,3 +83,10 @@ class HomeService:
             )
 
         return HomeRecommendRead(total=len(passed), recipes=items)
+
+    # [11/24 조현기] 첫 배너 음식 사진: 사진이 있는 레시피를 무작위로 count장
+    #   로그인과 상관없이 같은 동작 (누구에게나 보이는 장식)
+    @staticmethod
+    async def hero_images(db: AsyncSession, count: int = 10) -> list[HeroImageRead]:
+        rows = await HomeCrud.get_random_images(db, count)
+        return [HeroImageRead(recipe_id=recipe_id, image_url=image_url) for recipe_id, image_url in rows]

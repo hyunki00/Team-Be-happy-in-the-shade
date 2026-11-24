@@ -1,5 +1,6 @@
 # 담당: 조현기
 # 메인화면 전용 DB 조회 (11/24)
+#   [11/24 조현기] get_random_images 추가: 첫 배너 음식 사진용 (맨 아래)
 # - 메인의 '내 냉장고 재료로 만들 수 있는 요리'를 빠르게 만들기 위한 조회만 모아 둠
 # - 레시피마다 따로 DB에 묻지 않고, 필요한 값을 표 단위로 한 번씩만 가져온다 (쿼리 7번 안팎)
 #   (기존 /fridge/recommendations는 레시피 778개 × 여러 번 조회라 3초 넘게 걸림)
@@ -91,5 +92,20 @@ class HomeCrud:
             .join(Ingredient, Ingredient.ing_id == RecipeIngredient.ing_id)
             .where(RecipeIngredient.recipe_id.in_(recipe_ids))
             .order_by(RecipeIngredient.recipe_ing_id)
+        )
+        return list(result.all())
+
+    # [11/24 조현기] 첫 배너 오른쪽에 깔 음식 사진: 사진이 있는 레시피를 무작위로 count개
+    #   SQL로 쓰면: SELECT recipe_id, image_url FROM recipes
+    #               WHERE image_url IS NOT NULL AND image_url <> '' ORDER BY RAND() LIMIT 10
+    #   ORDER BY RAND(): 줄 순서를 매번 무작위로 섞음 → 새로고침할 때마다 다른 음식
+    #   (레시피 778개라 1~2ms. 레시피가 수십만 개가 되면 느려지는 방법이니 그때는 바꿔야 함)
+    @staticmethod
+    async def get_random_images(db: AsyncSession, count: int) -> list[tuple[int, str]]:
+        result = await db.execute(
+            select(Recipe.recipe_id, Recipe.image_url)
+            .where(Recipe.image_url.is_not(None), Recipe.image_url != "")
+            .order_by(func.rand())
+            .limit(count)
         )
         return list(result.all())

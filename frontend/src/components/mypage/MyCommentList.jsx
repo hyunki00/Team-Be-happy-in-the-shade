@@ -6,18 +6,17 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 
 // 댓글 조회 데이터는 부모의 comments props로 전달받음. 조회 API는 부모에서 연결
-function MyCommentList({ comments }) {
+// [수정 11/24 조현기] 원래는 수정 · 삭제 버튼이 'DB 연결 후 제공 예정' 알림만 띄웠음
+//   - [삭제]: 부모(MyPage)에게 받은 onDelete(댓글)를 부름 → MyPage가 확인창 + 삭제 API + 목록 갱신
+//   - [수정]: 버튼을 뺌. 대신 링크 글자를 '원문 보기 · 수정'으로 바꿔서, 원래 글로 가서 그 화면의 댓글 칸에서 고침
+//     (레시피 상세의 CommentSection · 게시글 상세에 이미 수정 기능이 있어서, 같은 기능을 여기 또 만들지 않음)
+//   - onDelete?.(…): onDelete를 안 넘겨준 경우에도 오류 없이 넘어감
+function MyCommentList({ comments, onDelete }) {
   // 탭 전환·필터링·정렬은 DB 연결 후에도 사용
   const [activeTab, setActiveTab] = useState('recipe');
   const visibleComments = comments
     .filter((comment) => comment.targetType === activeTab)
     .sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''));
-
-  //댓글 수정·삭제는 DB 연결 후 구현 예정 알림
-  const notifyPending = (action) => {
-    // API 연결 후 본인 댓글 권한 확인 및 성공 시 목록 갱신
-    window.alert(`댓글 ${action} 기능은 DB 연결 후 제공될 예정입니다.`);
-  };
 
   // 목록·빈 목록 안내·원문 링크 출력
   return (
@@ -47,10 +46,9 @@ function MyCommentList({ comments }) {
               {comment.targetTitle != null ? (
                 <div className="mt-1 flex gap-3 text-sm text-muted">
                   <Link to={`/${comment.targetType === 'recipe' ? 'recipes' : 'board'}/${comment.targetId}`} className="hover:text-accent">
-                    원문 보기
+                    원문 보기 · 수정
                   </Link>
-                  <button type="button" className="hover:text-accent" onClick={() => notifyPending('수정')}>수정</button>
-                  <button type="button" className="hover:text-miss" onClick={() => notifyPending('삭제')}>삭제</button>
+                  <button type="button" className="hover:text-miss" onClick={() => onDelete?.(comment)}>삭제</button>
                 </div>
               ) : (
                 <p className="text-sm text-muted">원문을 확인할 수 없습니다.</p>

@@ -6,6 +6,27 @@
 //     + 127.0.0.1로 보내면 localhost에서 받은 로그인 쿠키가 같이 안 가는 문제
 //   - 일치율 막대는 재료를 골랐을 때만 표시 (안 고르면 서버가 일치율을 주지 않음)
 //   - '내 냉장고 재료 우선' 스위치는 woojung 브랜치처럼 아직 검색 조건에 반영 안 됨 → 켜면 "준비 중" 안내
+//     (→ 이후 권우정이 fridge_first로 반영함. 지금은 정상 동작)
+//
+// [수정 11/24 조현기] 발견된 문제 수정 — 코드 안 [수정 11/24] 주석이 있는 곳
+//   1) 검색 결과 개수: '이 페이지 개수' → '전체 개수'
+//        서버가 레시피 목록과 함께 전체 개수를 응답 헤더 X-Total-Count로 보내 줌 (본문은 그대로 목록)
+//   2) 한 페이지 20개 → 12개 (한 줄 3개 × 4줄이 딱 맞음), 페이지 표시 '1 / 65 페이지'
+//        예전에는 21개를 받아서 '다음 페이지가 있나'만 알았는데, 이제 전체 개수로 계산
+//   3) 왼쪽 필터 카드가 스크롤을 내려도 화면을 따라옴 (CSS sticky)
+//   4) 냉장고 우선 ON이면 정렬은 '일치율 높은 순'으로 고정 (드롭다운 잠금)
+//        이때 서버는 항상 일치율 순으로 보내는데, 드롭다운은 '최신순'으로 보여서 헷갈렸음
+//        냉장고 우선 OFF면 일치율이 없으니 '일치율 높은 순'은 목록에서 뺌 (골라도 아무 일이 없었음)
+//   4-1) [2차] 재료 필터 = '고른 재료가 모두 들어간 레시피' (냉장고 우선 OFF면 최신순 · 인기순 그대로)
+//        원래는 "고른 재료가 레시피 재료의 50% 이상"이라 감자 하나만 고르면 0개가 나왔음 (백엔드에서 수정)
+//        일치율 막대도 냉장고 우선 ON일 때만 보임 (재료 필터만으로는 일치율을 계산하지 않음)
+//   5) 냉장고 우선 + 재료 필터를 같이 쓰면 필터가 무시되던 문제 → 백엔드(services/recipe.py)에서 수정
+//        고른 재료가 '모두' 들어간 레시피만 남기고, 일치율은 내 냉장고 기준. 화면에는 안내 한 줄 추가
+//   6) 초기화 버튼이 없는 정렬값("name")을 넣던 것 → "latest"
+//   7) 린트 오류 3개 (react-hooks/set-state-in-effect: 이펙트 안에서 바로 setState 하면 화면을 두 번 그림)
+//        - '로그아웃하면 스위치 끄기' 이펙트   → isFridgeOn(로그인 && 스위치)으로 계산해서 씀
+//        - '조건이 바뀌면 1페이지로' 이펙트   → changeFilters가 조건을 바꿀 때 같이 1페이지로
+//        - '스위치 끄면 냉장고 재료 수 비우기' → 꺼져 있으면 그 값을 안 쓰니 비울 필요 없음
 // [디자인 11/22 조현기] 시안 F + 와이어프레임 p.15~17 레이아웃 (왼쪽 필터 칩 · 위쪽 스위치 · 식재료 선택 모달 · 카드 한 줄 최대 3개)
 import RecipeCard from "../components/RecipeCard";
 import { useState, useEffect } from "react";
@@ -56,20 +77,50 @@ function RecipeListPage() {
   // 식재료 대분류 선택 상태
   const [ingredientCategory, setIngredientCategory] = useState(null);
 
-  // 모든 재료 일치 버튼의 ON/OFF 상태 (현재는 화면 상태만 변경하며 검색 조건에는 반영되지 않음)
+  // 내 냉장고 재료 우선 스위치 ON/OFF
   const [isAllIngredientsOn, setIsAllIngredientsOn] = useState(false);
 
   // 현재 페이지 번호
   const [page, setPage] = useState(1);
 
-  // 다음 페이지가 존재하는지
-  const [hasNextPage, setHasNextPage] = useState(false);
+  // [수정 11/24 조현기] 검색 결과 전체 개수 (서버 응답 헤더 X-Total-Count에서 받음)
+  //   '검색 결과 N개' 표시, 전체 페이지 수 · 다음 페이지가 있는지 계산에 씀
+  //   (원래 있던 hasNextPage 상태는 이 값으로 계산하는 변수로 바뀜, 아래 참고)
+  const [total, setTotal] = useState(0);
 
   // 한 페이지에 표시할 레시피 수
-  const PAGE_SIZE = 20;
+  // [수정 11/24 조현기] 20 → 12 (카드가 한 줄에 3개라 12개면 4줄이 꽉 참. 20개면 마지막 줄이 2개만 남았음)
+  const PAGE_SIZE = 12;
 
   // 로그인 상태 확인
   const { isAuthenticated } = useAuth();
+
+  // [수정 11/24 조현기] '냉장고 우선이 실제로 켜져 있는지'
+  //   원래는 로그아웃하면 이펙트에서 setIsAllIngredientsOn(false)로 껐음 (린트 오류)
+  //   지금은 스위치 값은 그대로 두고 '로그인했고 && 스위치가 켜짐'일 때만 켜진 것으로 계산
+  //   → 아래 코드에서는 isAllIngredientsOn 대신 이 isFridgeOn을 씀
+  const isFridgeOn = isAuthenticated && isAllIngredientsOn;
+
+  // [수정 11/24 조현기] 서버가 '일치율 높은 순'으로 정렬해서 보내는 경우인지
+  //   냉장고 우선 ON이면 true → 정렬 드롭다운을 '일치율 높은 순'으로 잠금
+  //   [2차] 원래는 재료를 골라도 true였음 → 이제 재료만 고르면 최신순 · 인기순을 그대로 고를 수 있음
+  const isMatchSort = isFridgeOn;
+
+  // [수정 11/24 조현기] 전체 페이지 수 · 다음 페이지가 있는지 (상태가 아니라 total로 매번 계산)
+  //   예) total 778, PAGE_SIZE 12 → Math.ceil(778 / 12) = 65 페이지
+  //   결과가 0개여도 '1 / 1 페이지'로 보이게 Math.max(1, …)
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const hasNextPage = page < totalPages;
+
+  // [수정 11/24 조현기] 검색 조건을 바꾸는 함수 — 조건을 바꾸면서 1페이지로 돌아감
+  //   원래는 '조건이 바뀌면 setPage(1)' 이펙트가 따로 있었음 (린트 오류 + 3페이지에서 조건을 바꾸면
+  //   3페이지로 한 번 요청한 뒤 1페이지로 또 요청하는 낭비). 이제 한 번에 처리
+  //   쓰는 법: setFilters 대신 changeFilters({...}) 또는 changeFilters((prev) => ({...prev, …}))
+  //   (정렬 · 검색어 · 재료 · 칩 · 초기화가 모두 이걸 씀)
+  const changeFilters = (updater) => {
+    setFilters(updater);
+    setPage(1);
+  };
 
   // 검색 조건이나 페이지가 바뀔 때 백엔드에서 레시피를 다시 조회
   useEffect(() => {
@@ -118,26 +169,28 @@ function RecipeListPage() {
         }
 
         // 냉장고 우선 스위치가 켜져 있으면 서버에 전달
-        if (isAllIngredientsOn) {
+        if (isFridgeOn) {
           params.append("fridge_first", "true");
         }
 
-        // 화면에는 20개를 보여주지만 21개를 요청해 다음 페이지 존재 여부 확인
-        params.append("limit", PAGE_SIZE + 1);
+        // [수정 11/24 조현기] 원래: 21개(PAGE_SIZE + 1)를 받아서 '21번째가 있으면 다음 페이지 있음'으로 판단
+        //   지금: 딱 한 페이지(12개)만 받고, 전체 개수는 응답 헤더로 받음
+        //   offset = 건너뛸 개수 (2페이지면 12개 건너뛰고 13번째부터)
+        params.append("limit", PAGE_SIZE);
         params.append("offset", (page - 1) * PAGE_SIZE);
 
         // [병합] api.js로 요청 (실패하면 axios가 오류를 던짐)
-        const { data } = await api.get(`/recipes?${params.toString()}`, {
+        // [수정 11/24 조현기] { data } 대신 response 전체를 받음 → 본문(response.data)과 헤더(response.headers)를 둘 다 씀
+        const response = await api.get(`/recipes?${params.toString()}`, {
           signal: controller.signal,
         });
 
         // 취소되지 않은 최신 요청의 결과만 반영
         if (!controller.signal.aborted) {
-          // 21번째 레시피가 있으면 다음 페이지가 존재함
-          setHasNextPage(data.length > PAGE_SIZE);
-
-          // 실제 화면에는 20개만 표시
-          setRecipes(data.slice(0, PAGE_SIZE));
+          setRecipes(response.data);
+          // [수정 11/24 조현기] 전체 개수 = 응답 헤더 X-Total-Count (axios는 헤더 이름을 소문자로 줌, 값은 글자라 Number로)
+          //   ?? : 왼쪽 값이 없으면(undefined) 오른쪽 값 → 헤더가 없는 옛 서버면 받은 개수로 대신함
+          setTotal(Number(response.headers["x-total-count"] ?? response.data.length));
         }
 
       } catch (err) {
@@ -164,8 +217,9 @@ function RecipeListPage() {
     filters.cooking_time,
     filters.ingredients,
     filters.sort, // 정렬 방식이 변경되면 API 다시 호출
-    isAllIngredientsOn,
-    page
+    isFridgeOn,   // [수정 11/24 조현기] isAllIngredientsOn → isFridgeOn (로그아웃하면 자동으로 꺼진 것으로 다시 조회)
+    page,
+    PAGE_SIZE     // [수정 11/24 조현기] 함수 안에서 쓰는 값이라 목록에 같이 적음 (값은 바뀌지 않음)
   ]);
 
   // 식재료 목록과 카테고리 가져오기
@@ -190,17 +244,15 @@ function RecipeListPage() {
     fetchIngredients();
   }, []);
 
-  // 로그아웃하면 모든 재료 일치 기능 OFF
-  useEffect(() => {
-    if (!isAuthenticated) {
-      setIsAllIngredientsOn(false);
-    }
-  }, [isAuthenticated]);
+  // [수정 11/24 조현기] 원래 여기 있던 '로그아웃하면 스위치 OFF' 이펙트는 삭제
+  //   위의 isFridgeOn(로그인 && 스위치)이 같은 일을 함 — 로그아웃하면 isFridgeOn이 자동으로 false
 
   // 냉장고 우선 검색을 켜면 내 냉장고 재료 개수 조회
   useEffect(() => {
-    if (!isAuthenticated || !isAllIngredientsOn) {
-      setFridgeIngredientCount(null);
+    // [수정 11/24 조현기] 꺼져 있을 때 setFridgeIngredientCount(null) 하던 줄 삭제 (린트 오류)
+    //   이 값은 '스위치가 켜져 있을 때' 빈 냉장고 안내에만 쓰므로, 꺼져 있으면 비울 필요가 없음
+    //   다시 켜면 아래 fetch 함수가 처음에 null로 비우고 새로 받아 옴
+    if (!isFridgeOn) {
       return;
     }
 
@@ -227,43 +279,17 @@ function RecipeListPage() {
     fetchFridgeIngredients();
 
     return () => controller.abort();
-  }, [isAuthenticated, isAllIngredientsOn]);
+  }, [isFridgeOn]);
 
-  // 검색 조건 변경 시 1페이지부터 다시 조회
-  useEffect(() => {
-    setPage(1);
-  }, [
-    filters.keyword,
-    filters.r_category_id,
-    filters.level,
-    filters.cooking_time,
-    filters.ingredients,
-    filters.sort,       // 추가: 정렬 방식 변경
-    isAllIngredientsOn  // 추가: 냉장고 우선 검색 ON/OFF
-  ]);
+  // [수정 11/24 조현기] 원래 여기 있던 '조건이 바뀌면 setPage(1)' 이펙트는 삭제
+  //   검색 조건은 changeFilters(위)가, 냉장고 우선 스위치는 스위치 버튼(아래)이 바꿀 때 바로 1페이지로 돌림
 
-  // 검색 조건은 백엔드에서 적용되므로 응답받은 목록을 그대로 사용
-  const filteredRecipes = recipes;
-
-  // 정렬에 사용할 레시피 목록
-  const recipesWithMatch = filteredRecipes;
-
-  // 정렬 기준에 따라 레시피 정렬
-  const sortedRecipes = [...recipesWithMatch].sort((a, b) => {
-
-    // 냉장고 우선 검색은 백엔드 정렬 순서를 유지
-    if (isAllIngredientsOn) {
-      return 0;
-    }
-
-    // 일치율 높은 순을 선택한 경우
-    if (filters.sort === "match_rate") {
-      return (b.match_rate ?? 0) - (a.match_rate ?? 0);
-    }
-
-    // 최신순 / 인기순은 백엔드 정렬 순서를 유지
-    return 0;
-  });
+  // 검색 조건 · 정렬은 모두 백엔드에서 적용되므로 응답받은 목록을 그대로 사용
+  // [수정 11/24 조현기] 화면에서 다시 정렬하던 코드 삭제
+  //   예전에는 '일치율 높은 순'을 고르면 화면에서 다시 정렬했는데, 받은 12개 안에서만 섞여서 페이지마다 순서가 어긋났음
+  //   이제 일치율 순서는 서버가 전체를 기준으로 정해서 보내므로 받은 순서 그대로 보여 줌
+  //   (sortedRecipes라는 이름은 아래 화면 코드가 쓰고 있어서 그대로 둠)
+  const sortedRecipes = recipes;
 
   // 식재료 선택 및 선택 해제
   const handleIngredientToggle = (ingId) => {
@@ -276,7 +302,7 @@ function RecipeListPage() {
 
   // 선택한 재료를 실제 검색에 반영
   const handleIngredientConfirm = () => {
-    setFilters((prev) => ({
+    changeFilters((prev) => ({
       ...prev,
       ingredients: tempIngredients,
     }));
@@ -293,7 +319,7 @@ function RecipeListPage() {
   // 임시 선택과 확정된 검색 재료를 모두 비우고 선택창을 닫음
   const handleIngredientClear = () => {
     setTempIngredients([]);
-    setFilters((prev) => ({
+    changeFilters((prev) => ({
       ...prev,
       ingredients: [],
     }));
@@ -302,13 +328,16 @@ function RecipeListPage() {
 
   // 검색어, 필터, 정렬 기준 초기화
   const handleReset = () => {
-    setFilters({
+    // [수정 11/24 조현기] 두 가지
+    //   - sort: "name" → "latest" : "name"은 정렬 목록에 없는 값이라, 초기화하면 드롭다운이 빈칸처럼 보였음
+    //   - setFilters → changeFilters : 초기화할 때도 1페이지로
+    changeFilters({
       keyword: "",
       ingredients: [],
       r_category_id: null,
       level: null,
       cooking_time: null,
-      sort: "name",
+      sort: "latest",
     });
     setIngredientKeyword("");
     setIngredientCategory(null);    
@@ -323,7 +352,7 @@ function RecipeListPage() {
 
   // 고른 재료 하나만 검색에서 빼기 (왼쪽 필터의 재료 칩 ✕)
   const handleIngredientRemove = (ingId) => {
-    setFilters((prev) => ({
+    changeFilters((prev) => ({
       ...prev,
       ingredients: prev.ingredients.filter((id) => id !== ingId),
     }));
@@ -344,7 +373,7 @@ function RecipeListPage() {
 
   // 왼쪽 필터 칩: 고른 값을 다시 누르면 '전체'로 돌아감
   const toggleFilter = (key, value) =>
-    setFilters((prev) => ({ ...prev, [key]: prev[key] === value ? null : value }));
+    changeFilters((prev) => ({ ...prev, [key]: prev[key] === value ? null : value }));
 
   const chipClass = (isOn) =>
     `inline-flex items-center h-9 px-3.5 rounded-pill text-sm font-medium ${
@@ -376,7 +405,7 @@ function RecipeListPage() {
         className="h-14 w-full rounded-pill border-0 px-6 text-base shadow-card"
         value={filters.keyword}
         onChange={(e) =>
-          setFilters({
+          changeFilters({
             ...filters,
             keyword: e.target.value,
           })
@@ -387,7 +416,12 @@ function RecipeListPage() {
       <div className="grid items-start gap-6 lg:grid-cols-[260px_1fr]">
 
         {/* ② 왼쪽 필터 */}
-        <aside aria-label="필터" className="flex flex-col gap-6 rounded-card bg-surface p-6 shadow-card">
+        {/* [수정 11/24 조현기] 스크롤을 내려도 필터 카드가 화면 위쪽에 붙어서 따라옴
+            - lg:sticky lg:top-6 : 넓은 화면(1024px 이상)에서만, 화면 위에서 24px 지점에 붙음
+                                   (좁은 화면은 필터가 결과 위에 쌓이는 한 줄 배치라 따라올 필요 없음)
+            - lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto : 필터가 화면보다 길면 카드 안에서만 따로 스크롤
+            - sticky는 부모 grid의 items-start(위쪽 정렬)가 있어야 동작함 (이미 있음) */}
+        <aside aria-label="필터" className="flex flex-col gap-6 rounded-card bg-surface p-6 shadow-card lg:sticky lg:top-6 lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-black">필터</h2>
             <button type="button" className="text-sm text-muted underline hover:text-accent" onClick={handleReset}>
@@ -425,6 +459,10 @@ function RecipeListPage() {
             >
               + 식재료 선택
             </button>
+            {/* [수정 11/24 조현기 2차] 재료 필터가 어떻게 걸리는지 안내 (여러 개면 모두 들어간 레시피만) */}
+            {filters.ingredients.length > 0 && (
+              <p className="text-xs text-muted">고른 재료가 모두 들어간 레시피만 보여요.</p>
+            )}
             {/* 실제 검색에 적용된 재료까지 삭제 */}
             {filters.ingredients.length > 0 && (
               <button type="button" className="self-start text-xs text-muted underline hover:text-accent" onClick={handleIngredientClear}>
@@ -479,29 +517,34 @@ function RecipeListPage() {
           {/* ③ 내 냉장고 재료 우선 스위치 (와이어프레임 p.15·17): 결과 맨 위 */}
           <div
             className={`flex flex-wrap items-center gap-x-4 gap-y-1 rounded-[20px] px-5 py-3 ${
-              isAllIngredientsOn ? "bg-have-soft" : "bg-surface shadow-card"
+              isFridgeOn ? "bg-have-soft" : "bg-surface shadow-card"
             }`}
           >
             <button
               type="button"
               role="switch"
-              aria-checked={isAllIngredientsOn}
+              aria-checked={isFridgeOn}
               aria-label="내 냉장고 재료 우선"
               disabled={!isAuthenticated}
-              onClick={() => setIsAllIngredientsOn((prev) => !prev)}
+              onClick={() => {
+                // [수정 11/24 조현기] 켜고 끌 때도 1페이지로 (원래 이펙트가 하던 일)
+                //   !isFridgeOn: 지금 '실제로 켜진 상태'의 반대로 바꿈
+                setIsAllIngredientsOn(!isFridgeOn);
+                setPage(1);
+              }}
               className={`relative h-7 w-12 flex-none rounded-pill transition-colors disabled:opacity-40 ${
-                isAllIngredientsOn ? "bg-have" : "bg-gray-300"
+                isFridgeOn ? "bg-have" : "bg-gray-300"
               }`}
             >
               <span
                 className={`absolute top-1 left-1 h-5 w-5 rounded-full bg-surface transition-transform ${
-                  isAllIngredientsOn ? "translate-x-5" : ""
+                  isFridgeOn ? "translate-x-5" : ""
                 }`}
               />
             </button>
-            <span className={`font-bold ${isAllIngredientsOn ? "text-have" : "text-ink"}`}>내 냉장고 재료 우선</span>
+            <span className={`font-bold ${isFridgeOn ? "text-have" : "text-ink"}`}>내 냉장고 재료 우선</span>
             {/* [병합] 켰을 때 안내. woojung 브랜치에서도 아직 검색 조건에 반영 전이라 '준비 중'으로 표시 */}
-            {isAllIngredientsOn ? (
+            {isFridgeOn ? (
               <div className="basis-full flex flex-col gap-0.5 pl-16 text-sm text-have">
                 <p>
                   내 냉장고 재료와 50% 이상 일치하는 레시피를
@@ -510,6 +553,11 @@ function RecipeListPage() {
                 <p>
                   일치율이 같으면 내 조리도구로 만들 수 있는 요리를 먼저 보여드려요.
                 </p>
+                {/* [수정 11/24 조현기] 냉장고 우선 + 재료 필터를 같이 쓸 때 안내 한 줄
+                    (이때 서버는 고른 재료가 '모두' 들어간 레시피만, 일치율은 내 냉장고 기준으로 보냄) */}
+                {filters.ingredients.length > 0 && (
+                  <p>왼쪽에서 고른 재료가 모두 들어간 레시피만 보여드려요.</p>
+                )}
               </div>
             ) : (
               !isAuthenticated && (
@@ -522,23 +570,36 @@ function RecipeListPage() {
 
           {/* ④ 결과 개수 + 정렬 */}
           <div className="flex flex-wrap items-center justify-between gap-3">
+            {/* [수정 11/24 조현기] '이 페이지 개수' → '전체 개수' (total)
+                toLocaleString(): 1000 → "1,000"처럼 쉼표. 원래 붙던 '(이 페이지)' 글자는 뺌 */}
             <p className="text-lg font-black">
-              검색 결과 <span className="text-accent">{filteredRecipes.length}개</span>{(page > 1 || hasNextPage) && <span className="ml-2 text-sm font-medium text-muted">(이 페이지)</span>}
+              검색 결과 <span className="text-accent">{total.toLocaleString()}개</span>
             </p>
+            {/* [수정 11/24 조현기] 정렬 드롭다운
+                - isMatchSort(냉장고 우선 ON)면: '일치율 높은 순' 하나만 보이고 잠김(disabled)
+                    서버가 이때는 항상 일치율 순으로 보내기 때문 (예전엔 '최신순'으로 보여서 헷갈렸음)
+                    filters.sort 값은 그대로 두므로, 스위치를 끄면 원래 고르던 최신순/인기순으로 돌아감
+                - 그 밖에는(재료만 골랐을 때 포함): 최신순 · 인기순만 (일치율이 없어서 '일치율 높은 순'은 뺌) */}
             <select
               aria-label="정렬"
-              className="h-10 rounded-pill pr-8 text-sm"
-              value={filters.sort}
+              className="h-10 rounded-pill pr-8 text-sm disabled:opacity-60"
+              value={isMatchSort ? "match_rate" : filters.sort}
+              disabled={isMatchSort}
               onChange={(e) =>
-                setFilters({
+                changeFilters({
                   ...filters,
                   sort: e.target.value,
                 })
               }
             >
-              <option value="latest">최신순</option>
-              <option value="popular">인기순</option>
-              <option value="match_rate">일치율 높은 순</option>
+              {isMatchSort ? (
+                <option value="match_rate">일치율 높은 순</option>
+              ) : (
+                <>
+                  <option value="latest">최신순</option>
+                  <option value="popular">인기순</option>
+                </>
+              )}
             </select>
           </div>
 
@@ -546,9 +607,9 @@ function RecipeListPage() {
           {loading && <p role="status" className="text-muted">레시피를 불러오는 중...</p>}
           {error && <p role="alert" className="rounded-[16px] bg-miss-soft px-5 py-3 text-miss">{error}</p>}
 
-          {!loading && !error && filteredRecipes.length === 0 && (
+          {!loading && !error && sortedRecipes.length === 0 && (
             <div className="rounded-card bg-surface p-8 text-center text-muted shadow-card">
-              {isAllIngredientsOn && fridgeIngredientCount === 0 ? (
+              {isFridgeOn && fridgeIngredientCount === 0 ? (
                 <>
                   <p>냉장고에 등록된 재료가 없어요.</p>
                   <p className="mt-2">
@@ -574,27 +635,37 @@ function RecipeListPage() {
               <RecipeCard
                key={recipe.recipe_id}
                recipe={recipe}
-               showMatch={filters.ingredients.length > 0 || isAllIngredientsOn}
+               showMatch={isFridgeOn} // [수정 11/24 조현기 2차] 일치율 막대는 냉장고 우선일 때만 (재료 필터만으로는 일치율 없음)
               />
             ))}
           </div>
 
-          {/* [병합] 페이지 이동 (woojung 브랜치, 한 페이지 20개) */}
+          {/* [병합] 페이지 이동 (woojung 브랜치) */}
+          {/* [수정 11/24 조현기] 페이지 이동
+              - 가운데 '현재 / 전체 페이지' (예: 1 / 65 페이지)
+              - '다음'은 마지막 페이지에서 잠김 (hasNextPage = page < totalPages)
+              - 넘기면 window.scrollTo({ top: 0 })로 화면 맨 위로 (아래에서 누르면 새 목록 첫 줄이 안 보였음) */}
           <div className="flex items-center justify-center gap-3 pt-2">
             <button
               type="button"
               className="h-10 rounded-pill bg-surface px-5 text-sm font-medium shadow-card hover:bg-gray-50 disabled:opacity-40"
               disabled={page === 1 || loading}
-              onClick={() => setPage((prev) => prev - 1)}
+              onClick={() => {
+                setPage((prev) => prev - 1);
+                window.scrollTo({ top: 0 });
+              }}
             >
               ‹ 이전
             </button>
-            <span className="text-sm font-bold">{page} 페이지</span>
+            <span className="text-sm font-bold">{page} / {totalPages} 페이지</span>
             <button
               type="button"
               className="h-10 rounded-pill bg-surface px-5 text-sm font-medium shadow-card hover:bg-gray-50 disabled:opacity-40"
               disabled={loading || !hasNextPage}
-              onClick={() => setPage((prev) => prev + 1)}
+              onClick={() => {
+                setPage((prev) => prev + 1);
+                window.scrollTo({ top: 0 });
+              }}
             >
               다음 ›
             </button>

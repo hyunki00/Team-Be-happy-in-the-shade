@@ -4,8 +4,16 @@
 //   2. 이메일 · 닉네임: 라벨 위 · 값 아래, 입력칸 최대 400px
 //   3. 변경하기 = 포인트색, 취소 = 회색 / 오류는 연한 빨간 상자
 
+// [수정 11/24 조현기] '변경하기'가 실제로 닉네임을 저장 (원래는 'DB 연결 후 제공 예정' 알림만 띄웠음)
+//   흐름: 글자 수 확인(원래 코드) → PATCH /users/me { nickname } → 성공하면 setUser(새 내 정보) + 초록 안내
+//   - 다른 사람과 겹치는 닉네임이면 서버가 400 "이미 사용 중인 닉네임입니다." → 빨간 상자에 그대로 표시
+//   - setUser: AuthContext의 로그인 정보를 바꿈 → 위 메뉴 · 마이페이지 왼쪽 프로필도 바로 새 닉네임
+//   - 사진은 업로드 방식을 팀에서 아직 정하지 않아 지금처럼 미리보기까지만 (저장 안 됨)
+//     사진을 바꾸고 저장하면 '사진 저장은 준비 중이에요' 안내를 같이 띄움
 import { useEffect, useRef, useState } from 'react';
 import { IMAGE_MAX_MB, IMAGE_TYPES, NICKNAME_MAX, NICKNAME_MIN } from '../../constants';
+import api from '../../api';
+import { useAuth } from '../../contexts/AuthContext';
 
 function ProfileEditor({ user }) {
   // 사용자 데이터는 부모의 user props로 전달받음. 조회 API는 부모·AuthContext에서 연결
@@ -17,6 +25,8 @@ function ProfileEditor({ user }) {
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [isReading, setIsReading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);   // [수정 11/24 조현기] 저장 중이면 true → 버튼 잠금 (두 번 눌러 두 번 저장되는 것 막기)
+  const { setUser } = useAuth();                     // [수정 11/24 조현기] 저장 후 로그인 정보(user)를 새 값으로 바꾸는 함수
   const fileInputRef = useRef(null);
   const readerRef = useRef(null);
 
@@ -69,10 +79,11 @@ function ProfileEditor({ user }) {
     setMessage('');
   };
 
-  // 프로필 변경: 실제 저장은 DB 연결 후 구현
-  const handleSubmit = (e) => {
+  // 프로필 변경
+  // [수정 11/24 조현기] 알림창만 띄우던 것 → 닉네임 저장 API 요청 (async: 서버 응답을 기다려야 해서)
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (isReading || !user) return;
+    if (isReading || isSaving || !user) return;
     const nickname = formData.nickname.trim();
     if (nickname.length < NICKNAME_MIN || nickname.length > NICKNAME_MAX) {
       setError(`닉네임은 ${NICKNAME_MIN}~${NICKNAME_MAX}글자로 입력해 주세요.`);
@@ -81,8 +92,19 @@ function ProfileEditor({ user }) {
 
     setError('');
     setMessage('');
-    // DB구현 후:  사진 업로드·삭제, 프로필 변경 API 요청, 성공 시 사용자 정보 갱신 및 실패 처리
-    window.alert('프로필 변경 기능은 DB 연결 후 제공될 예정입니다.');
+    setIsSaving(true);
+    try {
+      const { data } = await api.patch('/users/me', { nickname });
+      setUser(data);
+      // 사진을 바꿨는지 (바꿨어도 저장은 안 되니 안내를 다르게)
+      const photoChanged = formData.profile_image_url !== (user.profile_image_url ?? null);
+      setMessage(photoChanged ? '닉네임을 바꿨어요. (사진 저장은 준비 중이에요)' : '닉네임을 바꿨어요.');
+    } catch (err) {
+      const detail = err.response?.data?.detail;
+      setError(typeof detail === 'string' ? detail : '저장하지 못했어요. 잠시 후 다시 시도해 주세요.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   //  저장 전 입력만 원래 값으로 복원
@@ -130,7 +152,7 @@ function ProfileEditor({ user }) {
         {error && <p role="alert" className="rounded-[16px] bg-miss-soft px-4 py-3 text-sm text-miss">{error}</p>}
         {message && <p role="status" className="text-sm text-have">{message}</p>}
         <div className="flex gap-2">
-          <button type="submit" disabled={isReading} className="h-12 rounded-pill bg-accent px-6 font-bold text-white hover:bg-accent-dark disabled:opacity-40">변경하기</button>
+          <button type="submit" disabled={isReading || isSaving} className="h-12 rounded-pill bg-accent px-6 font-bold text-white hover:bg-accent-dark disabled:opacity-40">변경하기</button>
           <button type="button" onClick={handleCancel} className="h-12 rounded-pill bg-gray-100 px-6 font-medium hover:bg-gray-200">취소</button>
         </div>
       </form>

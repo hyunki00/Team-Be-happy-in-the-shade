@@ -12,9 +12,14 @@
 //   3. 재료 수정 · 등록 칸은 카드 아래로 (와이어프레임 ④ '아래에서 수정')
 //   4. 오른쪽 칸 안 스크롤에서 글자와 상자가 어긋나 보이는 문제 → 칸 안 스크롤 · 따라오기(sticky) 없앰
 //      대신 처음 6개만 보이고 'N개 모두 보기'로 펼침 (showAllRecipes 상태 추가, 추천 로직은 그대로)
+// [수정 11/24 조현기] 재료 추가: 검색어를 입력하면 입력칸 바로 아래에 결과 목록이 자동으로 펼쳐짐
+//   원래는 검색 후 따로 있는 '식재료를 선택하세요' 드롭다운(<select>)을 한 번 더 눌러 열어야 했음
+//   목록 모양은 레시피 쓰기(RecipeForm)의 재료 검색 목록과 같게 (흰 바탕 · 둥근 모서리 · 그림자 · 위아래 스크롤)
+//   검색 API(/ingredients?keyword=)와 고른 뒤 등록 칸(IngredientForm)이 뜨는 흐름은 그대로
+// [11/24 조현기] 오른쪽 '지금 만들 수 있는 요리' 작은 사진도 썸네일로 (원본 대신, 없으면 원본으로)
 import { useEffect, useState, useRef } from "react";
 import Swal from "sweetalert2";
-import api from "../api";
+import api, { thumbUrl, fallbackToOriginal } from "../api";   // [11/24 조현기] thumbUrl · fallbackToOriginal: 추천 목록 작은 사진도 썸네일로
 import IngredientCard from "../components/IngredientCard";
 import IngredientForm from "../components/IngredientForm";
 import { Link } from "react-router-dom";
@@ -189,13 +194,35 @@ function FridgePage() {
             <div className="flex min-w-0 flex-col gap-4">
               {isAdding && <section className={cardClass}>
                 <h2 className="text-lg font-bold">추가할 식재료 선택</h2>
-                <input aria-label="식재료 이름 검색" value={search} onChange={(e) => { setSearch(e.target.value); setSelected(null); }} placeholder="이름 또는 별칭 검색 (예: 계란)" className="h-11 rounded-pill px-5 mt-3 w-full" disabled={isSaving} />
-                {isSearching && <p role="status" className="mt-2 text-sm text-muted">식재료 검색 중...</p>}
+                {/* [수정 11/24 조현기] relative: 아래 결과 목록(absolute)을 이 입력칸 바로 밑에 붙이려고 */}
+                <div className="relative mt-3">
+                  <input aria-label="식재료 이름 검색" value={search} onChange={(e) => { setSearch(e.target.value); setSelected(null); }} placeholder="이름 또는 별칭 검색 (예: 계란)" className="h-11 rounded-pill px-5 w-full" disabled={isSaving} />
+                  {/* [수정 11/24 조현기] 검색 결과 목록 (원래 <select> 대신)
+                      - 검색어가 있고, 아직 재료를 고르지 않았을 때만 자동으로 펼쳐짐
+                      - 하나를 누르면: 그 재료를 고르고(setSelected) 입력칸에 이름을 채움 → 목록은 닫히고 아래에 등록 칸이 뜸
+                      - 입력칸 글자를 다시 바꾸면 고른 것이 풀리고(setSelected(null)) 목록이 다시 펼쳐짐
+                      - absolute top-full: 입력칸 바로 아래에 겹쳐 뜸 (아래 내용을 밀지 않음), z-10: 다른 것보다 위
+                      - max-h-64 overflow-y-auto: 결과가 많으면 목록 안에서 스크롤 */}
+                  {search.trim() && !selected && (
+                    <div role="listbox" aria-label="검색한 식재료" className="absolute inset-x-0 top-full z-10 mt-1 flex max-h-64 flex-col overflow-y-auto rounded-[16px] bg-surface py-2 shadow-card ring-1 ring-line">
+                      {isSearching && catalog.length === 0 ? (
+                        <p role="status" className="px-4 py-2 text-sm text-muted">식재료 검색 중...</p>
+                      ) : catalog.length ? (
+                        catalog.map((item) => (
+                          <button key={item.ing_id} type="button" role="option" aria-selected="false" className="px-4 py-2 text-left hover:bg-gray-50"
+                            onClick={() => { setSelected(item); setSearch(item.ing_name); }}>
+                            {item.ing_name}
+                          </button>
+                        ))
+                      ) : (
+                        <p className="px-4 py-2 text-sm text-muted">검색된 식재료가 없습니다.</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+                {/* [수정 11/24 조현기] 검색어가 비어 있을 때 안내 (원래는 빈 드롭다운이 있었음) */}
+                {!search.trim() && <p className="mt-2 text-sm text-muted">재료 이름이나 별칭을 입력하면 아래에 목록이 떠요.</p>}
                 {catalogError && <p role="alert" className="mt-2 text-sm text-miss">{catalogError}</p>}
-                <select aria-label="추가할 식재료" value={selected?.ing_id || ""} disabled={isSaving || isSearching} onChange={(e) => setSelected(catalog.find((item) => item.ing_id === Number(e.target.value)) || null)} className="h-11 rounded-pill px-5 mt-2 w-full">
-                  <option value="">식재료를 선택하세요 ({catalog.length}개)</option>
-                  {catalog.map((item) => <option key={item.ing_id} value={item.ing_id}>{item.ing_name}</option>)}
-                </select>
                 <button disabled={isSaving} onClick={() => { setIsAdding(false); setSelected(null); }} className="mt-3 text-sm text-muted underline hover:text-accent">추가 닫기</button>
               </section>}
               <fieldset disabled={isSaving} className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 xl:grid-cols-6 gap-3">
@@ -226,7 +253,7 @@ function FridgePage() {
                     <li key={recipe.recipe_id}>
                       <Link to={`/recipes/${recipe.recipe_id}`} className="flex items-center gap-3 rounded-[18px] bg-surface p-2.5 hover:ring-2 hover:ring-have">
                         {recipe.image_url
-                          ? <img src={recipe.image_url} alt="" className="h-14 w-14 flex-none rounded-[12px] object-cover bg-photo" />
+                          ? <img src={thumbUrl(recipe.recipe_id, recipe.image_url)} onError={(e) => fallbackToOriginal(e, recipe.image_url)} loading="lazy" alt="" className="h-14 w-14 flex-none rounded-[12px] object-cover bg-photo" />
                           : <div className="h-14 w-14 flex-none rounded-[12px] bg-photo" aria-hidden="true" />}
                         <div className="min-w-0">
                           <p className="truncate font-bold">{recipe.recipe_title}</p>

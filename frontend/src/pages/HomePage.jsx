@@ -8,6 +8,7 @@
 // [11/24 조현기] 내 냉장고 추천: /fridge/recommendations(3초 넘게 걸림) → 메인 전용 /home/recommendations (0.1초 안팎)
 //   서버가 { total: 전체 개수, recipes: 위 4개 }로 줌. 계산 방법 · 순서는 기존 추천과 같음
 // [11/24 조현기] 인기 · 새 레시피 · 커뮤니티 새 글도 불러오는 동안 '아직 없어요' 대신 회색 자리 표시 (처음 값 null = 불러오는 중)
+// [11/24 조현기] 첫 배너 오른쪽에 음식 사진이 3초마다 스르륵 바뀜 (HeroFoodImages, 장식용)
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
@@ -19,6 +20,70 @@ const RECOMMEND_COUNT = 4;
 const POPULAR_COUNT = 4;
 const NEW_RECIPE_COUNT = 3;
 const NEW_POST_COUNT = 4;
+
+// [11/24 조현기] 첫 배너 음식 사진: 몇 장 받을지 · 몇 초마다 넘길지 (10장 × 3초 = 30초에 한 바퀴)
+const HERO_IMAGE_COUNT = 10;
+const HERO_INTERVAL_MS = 3000;
+
+// [11/24 조현기] 첫 배너 오른쪽 음식 사진 (장식용 — 눌러도 아무 일 없음)
+//   1. 처음 한 번 GET /home/hero-images로 사진이 있는 레시피 10장을 무작위로 받음 (새로고침마다 다른 음식)
+//   2. 10장을 모두 같은 자리에 겹쳐 두고, 지금 차례(index)인 한 장만 보이게(opacity-100) 함
+//      나머지는 투명(opacity-0). 차례가 바뀌면 이전 사진은 흐려지고 다음 사진은 나타남 (1초 동안 = 스르륵)
+//      → 10장을 처음부터 같이 불러 두니, 바뀌는 순간 빈칸이 생기지 않음
+//   3. 3초마다 index를 1씩 늘림. 마지막 다음은 다시 처음으로
+//   4. 모양: 왼쪽은 안 보이고 오른쪽으로 갈수록 드러나는 그라데이션(index.css의 hero-fade-mask) + 전체 반투명
+//   - 사진을 받기 전 · 받기 실패 · 사진이 깨진 경우: 그 사진은 안 보이고 베이지 바탕 그대로 (오류 안내 없음, 장식이라서)
+//   - 컴퓨터 설정에서 '애니메이션 줄이기'를 켠 사람: 넘기지 않고 첫 사진 한 장만 보여 줌
+function HeroFoodImages() {
+  const [images, setImages] = useState([]);        // 받은 사진 목록 [{ recipe_id, image_url }, …]
+  const [index, setIndex] = useState(0);           // 지금 보이는 사진 번호 (0부터)
+  const [loadedIds, setLoadedIds] = useState([]);  // 다 내려받은 사진의 recipe_id (다 받기 전에는 안 보이게)
+
+  // 1. 사진 목록 받기 (처음 한 번)
+  useEffect(() => {
+    const controller = new AbortController();
+    api.get("/home/hero-images", { params: { count: HERO_IMAGE_COUNT }, signal: controller.signal })
+      .then(({ data }) => setImages(data))
+      .catch(() => {});   // 장식이라 실패해도 조용히 (사진 없이 배너만)
+    return () => controller.abort();
+  }, []);
+
+  // 3. 3초마다 다음 사진으로 (사진이 2장 이상이고, '애니메이션 줄이기'가 꺼져 있을 때만)
+  useEffect(() => {
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (images.length < 2 || reduceMotion) return;
+    const timer = setInterval(() => {
+      setIndex((prev) => (prev + 1) % images.length);   // % : 나머지 → 9 다음은 0
+    }, HERO_INTERVAL_MS);
+    return () => clearInterval(timer);   // 화면을 떠나면 타이머 정지
+  }, [images.length]);
+
+  // 사진 한 장이 다 내려받아지면 기록 (onLoad)
+  const handleLoad = (recipeId) => setLoadedIds((prev) => [...prev, recipeId]);
+
+  return (
+    // absolute inset-y-0 right-0: 배너 카드의 위아래 끝까지, 오른쪽에 붙는 층 (카드에 relative가 있어야 카드 기준)
+    // w-full md:w-[65%]: 좁은 화면은 카드 전체, 넓은 화면은 오른쪽 65%만 → 음식이 오른쪽 빈 곳 가운데에 옴
+    // pointer-events-none: 장식이라 마우스 클릭을 아래(버튼)로 그대로 통과시킴
+    // opacity-30 md:opacity-70: 좁은 화면은 글자와 겹치니 더 옅게(30%), 넓은 화면은 70%
+    // aria-hidden: 화면 읽기 프로그램이 장식 사진을 읽지 않게
+    <div className="hero-fade-mask pointer-events-none absolute inset-y-0 right-0 w-full opacity-30 md:w-[65%] md:opacity-70" aria-hidden="true">
+      {images.map((image, i) => (
+        <img
+          key={image.recipe_id}
+          src={image.image_url}
+          alt=""
+          onLoad={() => handleLoad(image.recipe_id)}
+          // 지금 차례이고 다 내려받았을 때만 보이게. transition-opacity duration-1000: 투명도가 1초에 걸쳐 바뀜
+          // motion-reduce:transition-none: '애니메이션 줄이기'면 스르륵 없이 바로
+          className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-1000 motion-reduce:transition-none ${
+            i === index && loadedIds.includes(image.recipe_id) ? "opacity-100" : "opacity-0"
+          }`}
+        />
+      ))}
+    </div>
+  );
+}
 
 // 섹션 제목 + 더보기 링크
 function SectionTitle({ title, moreTo }) {
@@ -130,18 +195,21 @@ function HomePage() {
     <div className="flex flex-col gap-12">
       {/* ③ 첫 화면 배너: 왼쪽 큰 카드(사진 자리) + 오른쪽 포인트 카드 */}
       <section className="grid gap-4 md:grid-cols-[1fr_300px]">
-        <div className="flex min-h-72 flex-col justify-end rounded-[32px] bg-photo p-8 md:p-10">
-          <h1 className="text-3xl md:text-4xl font-black leading-tight">
+        {/* [11/24 조현기] relative overflow-hidden 추가: 음식 사진 층(HeroFoodImages)을 이 카드 안에 붙이고, 둥근 모서리 밖은 잘라냄 */}
+        <div className="relative flex min-h-72 flex-col justify-end overflow-hidden rounded-[32px] bg-photo p-8 md:p-10">
+          <HeroFoodImages />
+          {/* [11/24 조현기] 글자 · 버튼은 relative로 사진 층보다 위에 그려짐 (뒤에 오는 relative 요소가 위) */}
+          <h1 className="relative text-3xl md:text-4xl font-black leading-tight">
             냉장고 속 재료로
             <br />
             오늘 뭐 해먹지?
           </h1>
-          <p className="mt-3 text-ink-soft">
+          <p className="relative mt-3 text-ink-soft">
             {isAuthenticated
               ? "재료를 등록하면 지금 만들 수 있는 요리를 바로 보여드려요"
               : "로그인하고 재료를 담으면 지금 만들 수 있는 요리를 보여드려요"}
           </p>
-          <div className="mt-6">
+          <div className="relative mt-6">
             <Link
               to={isAuthenticated ? "/fridge" : "/login"}
               className="inline-flex items-center h-12 px-6 rounded-pill bg-ink text-white font-bold hover:bg-gray-800"

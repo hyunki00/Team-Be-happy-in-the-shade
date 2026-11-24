@@ -55,7 +55,7 @@ def send_mail(to: str, code: str) -> None:
         print(f"[메일 테스트 모드] {to} 인증번호: {code}")
         return
     msg = EmailMessage()
-    msg["Subject"] = "[그늘에있으면기분이해피하조] 인증번호"
+    msg["Subject"] = "[뭐먹] 인증번호"  # [수정 11/24 조현기] 메일 제목: 팀 이름 → 사이트 이름 '뭐먹' (받는 사람이 알아보게)
     msg["From"] = user
     msg["To"] = to
     msg.set_content(f"인증번호: {code}\n5분 안에 입력해 주세요.")

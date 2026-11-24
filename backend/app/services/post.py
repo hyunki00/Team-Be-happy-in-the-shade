@@ -1,5 +1,9 @@
 # 담당: 임유빈
 # [병합 수정 11/24 조현기] get_list의 '목록 카드 만들기' 부분을 build_list_items로 꺼냄 (마이페이지도 같이 씀). 게시판 목록 동작은 그대로
+# [수정 11/24 조현기] 이 파일에서 바뀐 곳
+#   get_detail   : 글에 연결된 레시피가 있으면 linked_recipe(레시피 카드)를 채워서 돌려줌
+#   write · edit : ① 없는 레시피 번호를 연결하면 500 대신 400
+#                  ② 사진 주소 중 blob:으로 시작하는 것은 저장하지 않음 (아래 설명)
 # 할 일: class PostService
 #   get_list / get_detail / write / edit / remove / toggle_like
 #   ※ 본인 글 · 댓글만 수정 · 삭제 (아니면 403), 사진 최대 5장
@@ -12,12 +16,15 @@
 from typing import Optional
 from fastapi import HTTPException, status
 from sqlalchemy import column, func, select, table
+from sqlalchemy.exc import IntegrityError   # [수정 11/24 조현기] DB 연결(외래 키) 오류: 없는 레시피 번호를 저장할 때 남 → 400으로 바꿔 줌
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.crud.post import PostCrud
 from app.db.models.posts import PostComment, PostLike
+from app.db.models.recipes import Recipe   # [수정 11/24 조현기] 관련 레시피 카드(제목 · 사진 · 시간 · 난이도) 조회
 from app.db.scheme.posts import (
     BOARD_IMAGE_MAX_COUNT,
+    LinkedRecipe,
     PostCommentCreate,
     PostCommentRead,
     PostCommentUpdate,
@@ -136,6 +143,31 @@ class PostService:
                   ).first()
                   is_liked = liked is not None
 
+            # [수정 11/24 조현기] 관련 레시피 카드 만들기
+            #   - 글에 recipe_id가 있으면 그 레시피 + 레시피 작성자 닉네임을 JOIN 한 번으로 가져옴
+            #     (isouter=True: 작성자 정보가 없어도 레시피는 가져오는 LEFT JOIN)
+            #   - 연결 안 했으면(None) 또는 레시피가 이미 지워졌으면(row 없음) linked_recipe는 None
+            #   - .first(): 결과 첫 줄 (없으면 None). row는 (Recipe, 닉네임) 두 값 묶음
+            linked_recipe = None
+            if post.recipe_id is not None:
+                  row = (
+                        await db.execute(
+                              select(Recipe, users_t.c.nickname)
+                              .join(users_t, users_t.c.user_id == Recipe.user_id, isouter=True)
+                              .where(Recipe.recipe_id == post.recipe_id)
+                        )
+                  ).first()
+                  if row:
+                        recipe, recipe_nickname = row
+                        linked_recipe = LinkedRecipe(
+                              recipe_id=recipe.recipe_id,
+                              recipe_title=recipe.recipe_title,
+                              image_url=recipe.image_url,
+                              nickname=recipe_nickname,
+                              cooking_time=recipe.cooking_time,
+                              level=recipe.level,
+                        )
+
             # 이미지 순번대로 정렬 후 PostDetail 스키마로 반환
             imgs = sorted(post.images, key=lambda img: img.p_image_order)
             return PostDetail(
@@ -150,6 +182,7 @@ class PostService:
                   images=[PostImageRead.model_validate(img) for img in imgs],
                   is_liked=is_liked,
                   is_mine=(user_id is not None and post.user_id == user_id),
+                  linked_recipe=linked_recipe,   # [수정 11/24 조현기] 위에서 만든 관련 레시피 카드 (없으면 None)
             )
 
       # 게시글 작성
@@ -159,6 +192,13 @@ class PostService:
             if not user_id:
                   raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="로그인이 필요합니다.")
             
+            # [수정 11/24 조현기] blob: 주소는 저장하지 않음
+            #   blob:http://localhost:5173/… 은 사진을 고를 때 브라우저가 미리보기용으로 만든 '임시 주소'
+            #   글쓴이 브라우저에서만, 그 창을 닫기 전까지만 보이고 다른 사람에겐 깨진 사진이 됨
+            #   [2차] 이제 화면은 사진을 POST /images로 먼저 올리고 진짜 주소를 보냄 → 여기는 혹시 남은 blob:을 막는 안전장치
+            #   (화면 BoardFormPage에서도 거르지만 서버에서 한 번 더)
+            data.images = [url for url in data.images if not url.startswith("blob:")]
+
             # 사진 최대 허용 장수 넘으면
             if len(data.images) > BOARD_IMAGE_MAX_COUNT:
                   raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail=f"사진은 최대 {BOARD_IMAGE_MAX_COUNT}장까지 등록할 수 있습니다.",)
@@ -168,6 +208,12 @@ class PostService:
                   created = await PostCrud.create(db, user_id=user_id, post=data)
                   post_id = created.post_id
                   await db.commit()
+            # [수정 11/24 조현기] 없는 레시피 번호를 연결하면
+            #   DB가 '그런 레시피가 없다'(외래 키 오류, IntegrityError)를 내면서 500 서버 오류가 났음
+            #   → 이 오류만 잡아서 되돌리고(rollback) 400 + 안내 문장. 다른 오류는 아래에서 원래대로
+            except IntegrityError:
+                  await db.rollback()
+                  raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="연결할 레시피를 찾을 수 없습니다.")
             except Exception:
                   await db.rollback()
                   raise
@@ -190,6 +236,11 @@ class PostService:
             if post.user_id != user_id:
                   raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="본인 게시글만 수정할 수 있습니다.")
             
+            # [수정 11/24 조현기] 수정 때도 blob: 주소는 저장하지 않음 (위 write 주석 참고)
+            #   images를 안 보냈으면(None) 기존 사진을 그대로 두므로 건드리지 않음
+            if data.images is not None:
+                  data.images = [url for url in data.images if not url.startswith("blob:")]
+
             # 새 사진 목록을 보낸 경우 최대 5장 제한 확인
             if data.images is not None and len(data.images) > BOARD_IMAGE_MAX_COUNT:
                   raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"사진은 최대 {BOARD_IMAGE_MAX_COUNT}장까지 등록할 수 있습니다.")
@@ -197,6 +248,10 @@ class PostService:
             try:
                   await PostCrud.update_by_id(db, post_id=post_id, post=data)
                   await db.commit()
+            # [수정 11/24 조현기] 수정 때도 같은 처리 (없는 레시피 번호 → 500 대신 400, 위 write 주석 참고)
+            except IntegrityError:
+                  await db.rollback()
+                  raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="연결할 레시피를 찾을 수 없습니다.")
             except Exception:
                   await db.rollback()
                   raise

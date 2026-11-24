@@ -3,6 +3,10 @@
 //   - 서버 요청을 직접 주소(127.0.0.1) 대신 api.js로 (로그인 쿠키가 같이 가야 추천을 받을 수 있음)
 //   - 안내 문구 '일치율 70%' → '50%' (MATCH_RATE 11/22 변경)
 //   - 인라인 style → Tailwind 클래스, 카드는 한 줄 최대 4개
+// [수정 11/24 조현기] 두 가지
+//   1) 린트 오류 1개 정리 (아래 useEffect의 [수정 11/24] 주석)
+//   2) 이 화면이 부르는 추천 API(/recipes/recommendations)가 빨라짐 — 약 3초 → 0.1초
+//      백엔드(services/recipe.py의 recommend)만 바뀌었고, 이 파일에서 고칠 것은 없음. 결과 · 순서도 전과 같음
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
@@ -23,9 +27,12 @@ function RecipeRecommendPage() {
 
   // 로그인 상태에 따라 냉장고 맞춤 추천 레시피를 조회
   useEffect(() => {
+    // [수정 11/24 조현기] 린트 오류(set-state-in-effect): 이펙트 안에서 바로 setState 하던 두 줄 삭제
+    //   삭제한 줄: setRecipes([]); setLoading(false);
+    //   로그인 안 했으면 아래 if (!isAuthenticated)에서 로그인 안내 화면만 그리고 끝나서
+    //   목록 · 로딩 값을 쓰지 않음 → 바꿀 필요가 없음
+    //   다시 로그인하면 아래 fetchRecommendations가 setLoading(true)부터 새로 시작함
     if (!isAuthenticated) {
-      setRecipes([]);
-      setLoading(false);
       return;
     }
 
