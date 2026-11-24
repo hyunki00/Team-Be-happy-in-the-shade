@@ -127,7 +127,7 @@ const isValid = title.trim() !== '' && content.trim() !== '' && !isSubmitting &&
 
     if (!isAuthenticated) {
       alert('로그인이 필요한 서비스입니다.');
-      navigate('/login');
+      navigate('/login', { state: { from: location.pathname } });   // [수정 11/24 조현기] 로그인하면 이 글쓰기 화면으로 돌아옴
       return;
     }
 

@@ -9,6 +9,7 @@
 //   서버가 { total: 전체 개수, recipes: 위 4개 }로 줌. 계산 방법 · 순서는 기존 추천과 같음
 // [11/24 조현기] 인기 · 새 레시피 · 커뮤니티 새 글도 불러오는 동안 '아직 없어요' 대신 회색 자리 표시 (처음 값 null = 불러오는 중)
 // [11/24 조현기] 첫 배너 오른쪽에 음식 사진이 3초마다 스르륵 바뀜 (HeroFoodImages, 장식용)
+// [11/24 조현기] 연출: 오른쪽 배너 숫자 카운트업(CountUp) · 레시피 카드가 왼쪽부터 차례로 나타남(animate-card-in)
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
@@ -99,6 +100,32 @@ function SectionTitle({ title, moreTo }) {
   );
 }
 
+// [11/24 조현기] 숫자 카운트업: 0부터 value까지 duration(ms) 동안 빠르게 올라감 (예: '157가지')
+//   - requestAnimationFrame: 화면이 다시 그려질 때마다(1초에 약 60번) tick을 불러 숫자를 조금씩 올림
+//   - 1 - (1 - p)³ : 처음엔 빠르게, 끝에서 천천히 멈추는 곡선 (p = 지난 시간 비율 0~1)
+//   - value가 바뀌면(추천 결과가 새로 오면) 0부터 다시
+//   - '애니메이션 줄이기' 설정이면 바로 최종 숫자 (그래도 setState는 다음 프레임에 — 린트 규칙)
+//   - 화면을 떠나면 cancelAnimationFrame으로 멈춤
+function CountUp({ value, duration = 900 }) {
+  const [shown, setShown] = useState(0);
+  useEffect(() => {
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const start = performance.now();
+    let frame;
+    const tick = (now) => {
+      const p = reduceMotion ? 1 : Math.min(1, (now - start) / duration);
+      setShown(Math.round(value * (1 - Math.pow(1 - p, 3))));
+      if (p < 1) frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [value, duration]);
+  return shown.toLocaleString();
+}
+
+// [11/24 조현기] 카드가 차례로 나타날 때 카드 사이 간격(ms). 4장이면 마지막 카드는 0.21초 늦게 시작
+const CARD_STAGGER_MS = 70;
+
 // 추천을 기다리는 동안 보여 줄 회색 자리 카드 (RecipeCard와 같은 크기)
 function RecipeCardSkeleton() {
   return (
@@ -131,8 +158,12 @@ function RecipeCardList({ recipes, showMatch = false, emptyText, columns = 4 }) 
   }
   return (
     <div className={gridClass}>
-      {recipes.map((recipe) => (
-        <RecipeCard key={recipe.recipe_id} recipe={recipe} showMatch={showMatch} />
+      {/* [11/24 조현기] 카드를 감싸서 차례로 나타나게: i번째 카드는 i × 70ms 늦게 시작 (animate-card-in, index.css)
+          카드 자체(RecipeCard)는 안 건드림 — 감싼 칸이 움직이고 카드는 그 안에 꽉 참(h-full) */}
+      {recipes.map((recipe, i) => (
+        <div key={recipe.recipe_id} className="animate-card-in" style={{ animationDelay: `${i * CARD_STAGGER_MS}ms` }}>
+          <RecipeCard recipe={recipe} showMatch={showMatch} />
+        </div>
       ))}
     </div>
   );
@@ -212,6 +243,8 @@ function HomePage() {
           <div className="relative mt-6">
             <Link
               to={isAuthenticated ? "/fridge" : "/login"}
+              // [수정 11/24 조현기] '로그인하고 시작하기' → 로그인하면 내 냉장고로 (로그인 뒤 기본은 이제 메인이라 따로 지정)
+              state={isAuthenticated ? undefined : { from: "/fridge" }}
               className="inline-flex items-center h-12 px-6 rounded-pill bg-ink text-white font-bold hover:bg-gray-800"
             >
               {isAuthenticated ? "내 냉장고 열기" : "로그인하고 시작하기"}
@@ -235,7 +268,8 @@ function HomePage() {
             </p>
           ) : isAuthenticated && recommendTotal > 0 ? (
             <p className="text-2xl font-black leading-snug">
-              <span className="text-5xl">{recommendTotal}</span>가지
+              {/* [11/24 조현기] 숫자가 0부터 올라감 (CountUp) */}
+              <span className="text-5xl"><CountUp value={recommendTotal} /></span>가지
               <br />
               지금 만들 수 있어요
             </p>

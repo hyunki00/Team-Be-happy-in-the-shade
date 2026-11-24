@@ -7,7 +7,7 @@
 //   이메일 인증을 실제 API로 연결 (비밀번호 찾기와 같은 email_auth: POST /auth/send-code · /auth/verify-code)
 
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';   // [수정 11/24 조현기] useLocation: 돌아갈 주소(from)를 로그인 화면에 넘김
 import { useAuth } from '../contexts/AuthContext';
 import { NICKNAME_MIN, PASSWORD_MIN } from '../constants';
 import api from '../api';
@@ -17,6 +17,9 @@ const INITIAL_FORM = { login_id: '', nickname: '', email: '', password: '', conf
 
 export default function SignUpPage() {
   const navigate = useNavigate();
+  // [수정 11/24 조현기] 로그인 화면에서 넘겨받은 '로그인 후 돌아갈 주소' → 가입 후 로그인 화면에 그대로 넘김
+  const location = useLocation();
+  const from = location.state?.from;
   const { signup, error, setError } = useAuth();
 
   const [form, setForm] = useState(INITIAL_FORM);
@@ -153,7 +156,7 @@ export default function SignUpPage() {
       });
 
       if (success) {
-        navigate('/login', { replace: true });
+        navigate('/login', { replace: true, state: { from } });   // [수정 11/24 조현기] from: 로그인하면 원래 화면으로
       }
     } catch (err) {
       setError(err.message || '회원가입에 실패했습니다.');
@@ -274,7 +277,7 @@ export default function SignUpPage() {
       </form>
 
       <p className="mt-6 text-center text-sm text-muted">
-        이미 계정이 있으신가요? <Link to="/login" className="font-bold text-accent">로그인</Link>
+        이미 계정이 있으신가요? <Link to="/login" state={{ from }} className="font-bold text-accent">로그인</Link>
       </p>
     </div>
   );

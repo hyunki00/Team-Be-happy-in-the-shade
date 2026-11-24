@@ -631,12 +631,15 @@ function RecipeListPage() {
           {/* ⑤ 결과 카드: 한 줄에 최대 3개 */}
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
             {/* [병합] 새 결과를 불러오는 동안에는 예전 카드를 숨김 */}
-            {!loading && sortedRecipes.map((recipe)=>(
+            {/* [11/24 조현기] 연출: 카드가 왼쪽부터 차례로 떠오르며 나타남 (메인과 같은 animate-card-in, 정의는 index.css)
+                i번째 카드는 i × 50ms 늦게 시작 (12장이면 마지막 카드 0.55초). 페이지를 넘길 때마다 새로 나타남 */}
+            {!loading && sortedRecipes.map((recipe, i)=>(
+              <div key={recipe.recipe_id} className="animate-card-in" style={{ animationDelay: `${i * 50}ms` }}>
               <RecipeCard
-               key={recipe.recipe_id}
                recipe={recipe}
                showMatch={isFridgeOn} // [수정 11/24 조현기 2차] 일치율 막대는 냉장고 우선일 때만 (재료 필터만으로는 일치율 없음)
               />
+              </div>
             ))}
           </div>
 
@@ -685,81 +688,91 @@ function RecipeListPage() {
               </button>
             </div>
 
-            <div className="grid min-h-0 flex-1 gap-0 overflow-y-auto md:grid-cols-[1fr_260px]">
-              {/* 왼쪽: 찾기 · 분류 · 재료 칩 */}
-              <div className="flex flex-col gap-4 p-6">
-                <div className="flex flex-wrap gap-2">
-                  <input
-                    type="text"
-                    placeholder="식재료 이름 검색"
-                    aria-label="식재료 이름 검색"
-                    className="h-11 min-w-0 flex-1 rounded-pill px-5"
-                    value={ingredientKeyword}
-                    onChange={(e) => setIngredientKeyword(e.target.value)}
-                  />
-                  <select
-                    aria-label="재료 대분류"
-                    className="h-11 rounded-pill pr-8"
-                    value={ingredientCategory ?? ""}
-                    onChange={(e) =>
-                      setIngredientCategory(
-                        e.target.value === "" ? null : Number(e.target.value)
-                      )
-                    }
+            {/* [수정 11/24 조현기] 창 배치를 바꿈 (A안)
+                원래: 왼쪽 재료 목록 + 오른쪽 '선택한 재료' 칸이 한 덩어리로 같이 스크롤
+                      → 오른쪽 칸이 목록(1,039개) 길이만큼 늘어나서 '찾기' 버튼이 목록 끝까지 밀려 내려갔음
+                지금: ① 검색 · 대분류 줄(고정) → ② 재료 칩 목록(여기만 스크롤) → ③ 아래 고정 줄(선택한 재료 + 버튼)
+                      → 목록을 아무리 내려도 선택한 재료와 버튼은 창 맨 아래에 늘 보임 (휴대폰 · 넓은 화면 같음)
+                검색 · 대분류 · 고르기 · 지우기 · 찾기 동작(함수)은 그대로 */}
+
+            {/* ① 검색 · 대분류 (스크롤해도 위에 고정) */}
+            <div className="flex flex-wrap gap-2 px-6 pt-5 pb-3">
+              <input
+                type="text"
+                placeholder="식재료 이름 검색"
+                aria-label="식재료 이름 검색"
+                className="h-11 min-w-0 flex-1 rounded-pill px-5"
+                value={ingredientKeyword}
+                onChange={(e) => setIngredientKeyword(e.target.value)}
+              />
+              <select
+                aria-label="재료 대분류"
+                className="h-11 rounded-pill pr-8"
+                value={ingredientCategory ?? ""}
+                onChange={(e) =>
+                  setIngredientCategory(
+                    e.target.value === "" ? null : Number(e.target.value)
+                  )
+                }
+              >
+                <option value="">전체 재료</option>
+                {ingredientCategories.map((category) => (
+                  <option
+                    key={category.ing_category_id}
+                    value={category.ing_category_id}
                   >
-                    <option value="">전체 재료</option>
-                    {ingredientCategories.map((category) => (
-                      <option
-                        key={category.ing_category_id}
-                        value={category.ing_category_id}
-                      >
-                        {category.category_name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                    {category.category_name}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-                <div className="flex flex-wrap gap-2">
-                  {filteredIngredients.map((ingredient) => (
-                    <button
-                      key={ingredient.ing_id}
-                      type="button"
-                      aria-pressed={tempIngredients.includes(ingredient.ing_id)}
-                      className={chipClass(tempIngredients.includes(ingredient.ing_id))}
-                      onClick={() => handleIngredientToggle(ingredient.ing_id)}
-                    >
-                      {tempIngredients.includes(ingredient.ing_id) ? "✓ " : ""}
-                      {ingredient.ing_name}
-                    </button>
-                  ))}
-                </div>
-                {filteredIngredients.length === 0 && (
-                  <p className="text-muted">검색 결과가 없습니다.</p>
-                )}
-                <p className="text-xs text-muted">누르면 선택, 다시 누르면 해제</p>
-              </div>
-
-              {/* 오른쪽: 선택한 재료 + 찾기 버튼 */}
-              <div className="flex flex-col gap-3 bg-gray-50 p-6">
-                <div className="flex items-center justify-between">
-                  <h4 className="font-bold">
-                    선택한 재료 <span className="text-accent">{tempIngredients.length}</span>
-                  </h4>
-                  {/* 선택창 안에서 임시로 고른 재료만 삭제 */}
+            {/* ② 재료 칩 목록: 여기만 스크롤 (min-h-0 flex-1: 남는 높이를 다 쓰고, 넘치면 이 안에서만 스크롤) */}
+            <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-4">
+              <div className="flex flex-wrap gap-2">
+                {filteredIngredients.map((ingredient) => (
                   <button
+                    key={ingredient.ing_id}
                     type="button"
-                    className="text-sm text-muted underline hover:text-accent disabled:opacity-40"
-                    onClick={() => setTempIngredients([])}
-                    disabled={tempIngredients.length === 0}
+                    aria-pressed={tempIngredients.includes(ingredient.ing_id)}
+                    className={chipClass(tempIngredients.includes(ingredient.ing_id))}
+                    onClick={() => handleIngredientToggle(ingredient.ing_id)}
                   >
-                    모두 지우기
+                    {tempIngredients.includes(ingredient.ing_id) ? "✓ " : ""}
+                    {ingredient.ing_name}
                   </button>
-                </div>
-                {/* 선택한 재료 0개 -> 안내 문구 표시 / 1개 이상 -> 안내 문구 숨김, 선택한 재료 버튼 표시 */}
-                {tempIngredients.length === 0 && (
-                  <p className="text-sm text-muted">선택한 재료가 없습니다.</p>
-                )}
-                <div className="flex flex-wrap gap-2">
+                ))}
+              </div>
+              {filteredIngredients.length === 0 && (
+                <p className="text-muted">검색 결과가 없습니다.</p>
+              )}
+              <p className="mt-3 text-xs text-muted">누르면 선택, 다시 누르면 해제</p>
+            </div>
+
+            {/* ③ 아래 고정 줄: 선택한 재료 + 버튼 (border-t: 목록과 구분선, bg-gray-50: 연한 바탕) */}
+            <div className="flex flex-col gap-3 border-t border-line bg-gray-50 px-6 py-4">
+              <div className="flex items-center justify-between">
+                <h4 className="font-bold">
+                  선택한 재료 <span className="text-accent">{tempIngredients.length}</span>
+                </h4>
+                {/* 선택창 안에서 임시로 고른 재료만 삭제 */}
+                <button
+                  type="button"
+                  className="text-sm text-muted underline hover:text-accent disabled:opacity-40"
+                  onClick={() => setTempIngredients([])}
+                  disabled={tempIngredients.length === 0}
+                >
+                  모두 지우기
+                </button>
+              </div>
+              {/* 선택한 재료 0개 -> 안내 문구 표시 / 1개 이상 -> 안내 문구 숨김, 선택한 재료 버튼 표시 */}
+              {tempIngredients.length === 0 && (
+                <p className="text-sm text-muted">선택한 재료가 없습니다.</p>
+              )}
+              {/* [수정 11/24 조현기] 고른 재료가 많아져도 이 줄이 창을 다 차지하지 않게 최대 높이(max-h-24 = 96px, 약 두 줄),
+                  넘치면 이 안에서만 스크롤 → 아래 버튼은 늘 보임 */}
+              {tempIngredients.length > 0 && (
+                <div className="flex max-h-24 flex-wrap gap-2 overflow-y-auto">
                   {ingredients
                     .filter((ingredient) => tempIngredients.includes(ingredient.ing_id))
                     .map((ingredient) => (
@@ -773,15 +786,17 @@ function RecipeListPage() {
                       </button>
                     ))}
                 </div>
-                <button
-                  type="button"
-                  className="mt-auto h-12 rounded-pill bg-accent font-bold text-white hover:bg-accent-dark disabled:opacity-40"
-                  onClick={handleIngredientConfirm}
-                  disabled={tempIngredients.length === 0}
-                >
-                  이 재료로 레시피 찾기 ({tempIngredients.length}) →
-                </button>
-              </div>
+              )}
+              {/* [수정 11/24 조현기] 화살표(→) 삭제, whitespace-nowrap: 숫자가 세 자리가 돼도 버튼 글자가 줄바꿈 · 넘침 없이 한 줄
+                  w-full sm:w-auto sm:self-end: 휴대폰은 꽉 찬 버튼, 넓은 화면은 오른쪽에 글자 길이만큼 */}
+              <button
+                type="button"
+                className="h-12 w-full whitespace-nowrap rounded-pill bg-accent px-6 font-bold text-white hover:bg-accent-dark disabled:opacity-40 sm:w-auto sm:self-end"
+                onClick={handleIngredientConfirm}
+                disabled={tempIngredients.length === 0}
+              >
+                이 재료로 레시피 찾기 ({tempIngredients.length})
+              </button>
             </div>
           </div>
         </div>

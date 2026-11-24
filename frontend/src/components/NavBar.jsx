@@ -2,7 +2,7 @@
 // 모든 페이지 위에 보이는 메뉴 (시안 F: 화면 위에 떠 있는 둥근 흰 메뉴바)
 // [11/24 조현기] 왼쪽 로고: 팀 이름 → 사이트 이름 '뭐먹' 로고 그림 (frontend/public/logo.png)
 //   숟가락 · 포크 · 베이지 배경까지 넣은 그림, 양 끝은 메뉴바 흰 바탕으로 흐려지게 만듦 (높이 폰 48px · PC 56px)
-import { Link, NavLink } from "react-router-dom";
+import { Link, NavLink, useLocation } from "react-router-dom";   // [수정 11/24 조현기] useLocation: 로그인 뒤 돌아갈 주소
 import { useAuth } from "../contexts/AuthContext";
 
 // 메뉴 목록 (end: 그 주소일 때만 선택 표시. /recipes/new에서 '레시피 검색'이 같이 켜지지 않게)
@@ -23,6 +23,12 @@ const menuClass = ({ isActive }) =>
 function NavBar() {
   const { isAuthenticated, user, logout } = useAuth();
 
+  // [수정 11/24 조현기] 위 메뉴 [로그인] · [회원가입]을 누르면 지금 보던 화면으로 돌아오게 (state.from)
+  //   지금 로그인 · 회원가입 · 비밀번호 찾기 화면이면 그 화면이 아니라, 이미 들고 있던 돌아갈 주소를 그대로 넘김
+  const location = useLocation();
+  const isAuthPage = ["/login", "/signup", "/password-reset"].includes(location.pathname);
+  const loginFrom = isAuthPage ? location.state?.from : location.pathname + location.search;
+
   const onLogoutClick = () => {
     logout();
   };
@@ -31,7 +37,10 @@ function NavBar() {
     <header className="px-4 pt-4 pb-6 md:px-6 md:pt-6 md:pb-8">
       <div className="mx-auto max-w-6xl flex flex-wrap items-center gap-x-4 gap-y-1 rounded-[32px] bg-surface py-2 pl-5 pr-2 md:pl-6 shadow-float">
         <Link to="/" className="flex-none" aria-label="뭐먹 홈으로">
-          <img src="/logo.png" alt="뭐먹" className="h-12 w-auto md:h-14" />
+          {/* [11/24 조현기] 연출: 처음 열 때 한 번 + 마우스를 올릴 때마다 요리사 모자처럼 살랑 (정의는 index.css)
+              origin-bottom: 아래쪽 가운데를 기준으로 흔들려서 모자가 접시 위에서 살랑이는 느낌
+              (로고가 그림 한 장이라 그림 전체가 흔들림) */}
+          <img src="/logo.png" alt="뭐먹" className="h-12 w-auto origin-bottom animate-hat-wiggle hover:animate-hat-hover md:h-14" />
         </Link>
 
         {/* 좁은 화면에서는 메뉴가 다음 줄로 내려가고 4칸으로 나눠 한 줄에 보인다 */}
@@ -61,11 +70,12 @@ function NavBar() {
             </>
           ) : (
             <>
-              <Link to="/login" className="inline-flex items-center h-11 px-3 text-[15px] font-medium hover:text-accent">
+              <Link to="/login" state={{ from: loginFrom }} className="inline-flex items-center h-11 px-3 text-[15px] font-medium hover:text-accent">
                 로그인
               </Link>
               <Link
                 to="/signup"
+                state={{ from: loginFrom }}
                 className="inline-flex items-center h-11 px-5 rounded-pill bg-accent text-white text-[15px] font-bold hover:bg-accent-dark"
               >
                 회원가입

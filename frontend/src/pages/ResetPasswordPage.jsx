@@ -7,7 +7,7 @@
 // [수정 11/24 조현기] 새 비밀번호 저장에 성공하면 '완료' 알림 → 로그인 화면으로 이동
 //   원래는 같은 화면에 성공 문구만 띄우고 인증 단계로 되돌아가서, 사용자가 직접 로그인 화면을 찾아가야 했음
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';   // [수정 11/24 조현기] useNavigate: 성공 후 로그인 화면으로 이동
+import { Link, useNavigate, useLocation } from 'react-router-dom';   // [수정 11/24 조현기] useNavigate: 성공 후 로그인 화면으로 이동
 import Swal from 'sweetalert2';   // [수정 11/24 조현기] 성공 알림 (확인을 누르면 이동)
 
 import api from "../api";
@@ -30,6 +30,8 @@ export default function ResetPasswordPage() {
   // 사용자 입력
   const [form, setForm] = useState({email: '', code: '', password: '', confirmPassword: ''});
   const navigate = useNavigate();   // [수정 11/24 조현기]
+  // [수정 11/24 조현기] 로그인 화면에서 넘겨받은 '로그인 후 돌아갈 주소' → 로그인 화면으로 돌아갈 때 그대로 넘김
+  const from = useLocation().state?.from;
  
   const [sentEmail, setSentEmail] = useState('');
   const [verifiedEmail, setVerifiedEmail] = useState('');
@@ -153,7 +155,7 @@ export default function ResetPasswordPage() {
       //   지금: 서버 문구("비밀번호를 바꿨습니다. 다시 로그인해 주세요.")를 알림으로 띄우고, 확인을 누르면 로그인 화면으로
       //   replace: true → 뒤로 가기를 눌러도 비밀번호 찾기 화면으로 돌아오지 않게 (회원가입 성공 때와 같은 방식)
       await Swal.fire('비밀번호 변경 완료', data.message, 'success');
-      navigate('/login', { replace: true });
+      navigate('/login', { replace: true, state: { from } });
     } catch (err) {
       setError(errorText(err));
     }
@@ -205,7 +207,7 @@ export default function ResetPasswordPage() {
       {error && <p role="alert" className="rounded-[16px] bg-miss-soft px-4 py-3 text-sm text-miss">{error}</p>}
       {message && <p role="status" className="text-sm text-have">{message}</p>}
 
-      <Link to="/login" className="text-center text-sm text-muted hover:text-accent">로그인으로 돌아가기</Link>
+      <Link to="/login" state={{ from }} className="text-center text-sm text-muted hover:text-accent">로그인으로 돌아가기</Link>
     </div>
   );
 }

@@ -5,6 +5,7 @@
 //   - 인라인 style → Tailwind 클래스, 카드는 한 줄 최대 4개
 // [수정 11/24 조현기] 두 가지
 //   1) 린트 오류 1개 정리 (아래 useEffect의 [수정 11/24] 주석)
+//   1-1) '로그인하기' 버튼: 로그인하면 이 추천 화면으로 돌아오게 state.from (원래는 냉장고로 감)
 //   2) 이 화면이 부르는 추천 API(/recipes/recommendations)가 빨라짐 — 약 3초 → 0.1초
 //      백엔드(services/recipe.py의 recommend)만 바뀌었고, 이 파일에서 고칠 것은 없음. 결과 · 순서도 전과 같음
 import { useEffect, useState } from "react";
@@ -80,7 +81,7 @@ function RecipeRecommendPage() {
       <div className="mx-auto mt-8 flex max-w-lg flex-col items-center gap-3 rounded-card bg-surface p-10 text-center shadow-card">
         <h1 className="text-2xl font-black">내 냉장고 맞춤 레시피 추천</h1>
         <p className="text-muted">로그인 후 이용할 수 있습니다.</p>
-        <Link to="/login" className="mt-2 inline-flex h-12 items-center rounded-pill bg-accent px-6 font-bold text-white hover:bg-accent-dark">로그인하러 가기</Link>
+        <Link to="/login" state={{ from: "/recipes/recommend" }} className="mt-2 inline-flex h-12 items-center rounded-pill bg-accent px-6 font-bold text-white hover:bg-accent-dark">로그인하러 가기</Link>
       </div>
     );
   }

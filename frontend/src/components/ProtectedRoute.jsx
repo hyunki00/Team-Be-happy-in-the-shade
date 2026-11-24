@@ -13,7 +13,8 @@ function ProtectedRoute({ children }) {
       </p>
     );
   }
-  if (!isAuthenticated) return <Navigate to="/login" state={{ from: location.pathname }} replace />;
+  // [수정 11/24 조현기] from에 주소 뒤 ?검색조건(location.search)까지 → 로그인 후 같은 조건의 화면으로
+  if (!isAuthenticated) return <Navigate to="/login" state={{ from: location.pathname + location.search }} replace />;
   return children;
 }
 

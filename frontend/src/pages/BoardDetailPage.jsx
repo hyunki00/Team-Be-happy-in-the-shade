@@ -16,7 +16,7 @@
 //   3) 린트 오류 6개: 안 쓰는 React import, catch (err)에서 안 쓰는 err
 
 import { useState, useEffect } from 'react'; // [API 변경] useEffect 추가 · [수정 11/24 조현기] 린트: 안 쓰는 React import 삭제 (React 17 이후 JSX에 필요 없음)
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';   // [수정 11/24 조현기] useLocation: 로그인 뒤 돌아올 주소
 import api from '../api'; // [API 변경] mockPosts, mockPostComments 제거 후 공통 api 사용
 import { useAuth } from '../contexts/AuthContext';
 import { COMMENT_MAX } from '../constants';
@@ -24,6 +24,7 @@ import { COMMENT_MAX } from '../constants';
 export default function BoardDetailPage({ onDeletePost }) { // [API 변경] posts = mockPosts 기본값 제거
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();   // [수정 11/24 조현기]
   const { user, isAuthenticated } = useAuth();
 
   // [API 변경] 초기값을 null / []로 두고 useEffect에서 API로 채움
@@ -172,7 +173,7 @@ export default function BoardDetailPage({ onDeletePost }) { // [API 변경] post
     e.preventDefault();
     if (!isAuthenticated) {
       alert('로그인이 필요합니다.');
-      navigate('/login');
+      navigate('/login', { state: { from: location.pathname } });   // [수정 11/24 조현기] 로그인하면 이 게시글로 돌아옴
       return;
     }
     if (!newComment.trim()) return;

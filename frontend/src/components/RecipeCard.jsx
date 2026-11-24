@@ -8,6 +8,7 @@
 //   - thumbUrl: 썸네일 주소 규칙 (api.js). 썸네일 파일이 없으면 onError에서 원본으로 자동 교체(fallbackToOriginal)
 //   - loading="lazy": 화면에 보이기 직전에 받음 (아래쪽 카드는 스크롤할 때) · decoding="async": 그리는 동안 화면이 멈추지 않게
 //   받는 값 · 보여 주는 내용 · 모양은 그대로
+// [11/24 조현기] 연출: 일치율 막대가 0%에서 실제 값까지 차오름 (animate-bar-fill, 정의는 index.css)
 import { Link } from "react-router-dom";
 import { thumbUrl, fallbackToOriginal } from "../api";
 
@@ -47,8 +48,9 @@ function RecipeCard({recipe, showMatch=false}) {
         {showMatch && (
           <div className="mt-1 flex items-center gap-3">
             <div className="h-2 flex-1 overflow-hidden rounded-pill bg-gray-100">
+              {/* [11/24 조현기] animate-bar-fill: 0.9초 동안 차오름 · origin-left: 왼쪽 끝을 기준으로 늘어나게 */}
               <div
-                className="h-full rounded-pill bg-have"
+                className="h-full origin-left rounded-pill bg-have animate-bar-fill"
                 style={{ width: `${Math.round(recipe.match_rate * 100)}%` }}
               />
             </div>

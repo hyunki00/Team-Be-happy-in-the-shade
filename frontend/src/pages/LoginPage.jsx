@@ -3,6 +3,12 @@
 //   1. auth-card · panel · form-field 클래스는 정의된 CSS가 없어서 적용이 안 되고 있었음 → Tailwind 클래스로 바꿈
 //   2. 가운데 흰 카드(최대 440px), 라벨 위 · 입력칸 아래, 로그인 버튼은 포인트색 알약
 //   3. 회원가입 · 비밀번호 찾기 링크를 아래 한 줄로
+// [수정 11/24 조현기] 로그인 뒤 이동 경로 정리
+//   규칙: "로그인을 누른 그 화면으로 돌아감. 돌아갈 화면이 없으면 메인(/)"
+//   - 로그인 화면으로 보내는 쪽이 state.from(돌아갈 주소)을 같이 넘김
+//     (위 메뉴 · 보호 화면 · 레시피 댓글 · 게시글 · 추천 페이지 · 메인 '로그인하고 시작하기'(→ 내 냉장고))
+//   - 회원가입 · 비밀번호 찾기를 거쳐 와도 from을 계속 들고 다님 → 가입하고 로그인해도 원래 화면으로
+//   - 원래는 from이 없으면 무조건 /fridge 라서, 위 메뉴로 로그인하면 보던 화면과 상관없이 냉장고로 갔음
 
 import { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
@@ -29,7 +35,9 @@ export default function LoginPage() {
     setSubmitting(false);
 
     if (success) {
-      navigate(location.state?.from || '/fridge', { replace: true });
+      // [수정 11/24 조현기] 돌아갈 화면(from)이 없으면 '/fridge' 대신 메인('/')
+      //   replace: true → 뒤로 가기를 눌러도 로그인 화면으로 다시 오지 않게
+      navigate(location.state?.from || '/', { replace: true });
     }
   };
 
@@ -59,9 +67,10 @@ export default function LoginPage() {
       </form>
 
       <div className="mt-6 flex justify-center gap-4 text-sm text-muted">
-        <Link to="/signup" className="hover:text-accent">회원가입</Link>
+        {/* [수정 11/24 조현기] state: 돌아갈 화면(from)을 회원가입 · 비밀번호 찾기에도 넘김 → 다시 로그인하면 원래 화면으로 */}
+        <Link to="/signup" state={{ from: location.state?.from }} className="hover:text-accent">회원가입</Link>
         <span aria-hidden="true">·</span>
-        <Link to="/password-reset" className="hover:text-accent">비밀번호 찾기</Link>
+        <Link to="/password-reset" state={{ from: location.state?.from }} className="hover:text-accent">비밀번호 찾기</Link>
       </div>
     </div>
   );
