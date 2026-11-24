@@ -8,13 +8,8 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { NICKNAME_MIN, PASSWORD_MIN } from '../constants';
-import { mockUser } from '../mockData';
+import api from '../api';
 
-// 현재 mockUser에 login_id가 없으면 demo1234를 테스트 아이디로 사용
-const MOCK_LOGIN_IDS = [mockUser.login_id ?? 'demo1234'];
-
-// 백엔드 연결 시 실제 이메일 발송·인증 API로 교체
-const MOCK_EMAIL_CODE = '123456';
 
 const INITIAL_FORM = { login_id: '', nickname: '', email: '', password: '', confirmPassword: '' };
 
@@ -51,8 +46,8 @@ export default function SignUpPage() {
     }
   };
 
-  //아이디 중복 확인
-  const checkId = () => {
+    // 아이디 중복 확인
+  const checkId = async () => {
     const id = form.login_id.trim();
 
     if (!/^[a-zA-Z0-9]{4,20}$/.test(id)) {
@@ -61,20 +56,24 @@ export default function SignUpPage() {
       return;
     }
 
-    // 백엔드 연결 시: 중복 확인 API 호출로 변경
-    const exists = MOCK_LOGIN_IDS.some(
-      (savedId) => savedId.toLowerCase() === id.toLowerCase()
-    );
+    try {
+      const { data } = await api.get('/users/check-login-id', {
+        params: { login_id: id },
+      });
 
-    if (exists) {
-      setCheckedId('');
-      setIdMessage('이미 사용 중인 아이디입니다.');
-      return;
-    }
+      if (!data.available) {
+        setCheckedId('');
+        setIdMessage('이미 사용 중인 아이디입니다.');
+        return;
+      }
 
       setCheckedId(id);
       setIdMessage('사용 가능한 아이디입니다.');
-    };
+    } catch {
+      setCheckedId('');
+      setIdMessage('아이디 중복 확인에 실패했습니다. 다시 시도해 주세요.');
+    }
+  };
 
   // 이메일 인증번호 요청 mock
   const sendEmailCode = () => {
