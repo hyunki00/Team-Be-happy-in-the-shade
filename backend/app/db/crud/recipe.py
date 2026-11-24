@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.recipes import ( Recipe, RecipeIngredient, RecipeStep, RecipeLike, Bookmark )
 from app.db.models.ingredients import Ingredient
-from app.db.scheme.recipes import RecipeIngredientItem, RecipeStepItem
+from app.db.scheme.recipes import RecipeIngredientItem, RecipeStepItem, RecipeCreate, RecipeUpdate
 from app.db.models.recipe_comments import RecipeComment
 
 # users 테이블에서 작성자 ID와 닉네임을 조회하기 위한 테이블 정의
@@ -359,7 +359,7 @@ class RecipeCrud:
             return None
 
         # 조리 도구 이름을 조회하기 위한 테이블 정의
-        tools_t = table(
+            tools_t = table(
             "standard_tools",
             column("tool_id"),
             column("tool_name")
@@ -372,26 +372,126 @@ class RecipeCrud:
         result = await db.execute(stmt)
         return result.scalar_one_or_none()
 
-    # 사용자가 보유한 조리도구 ID 목록 조회
+
+# -- (오효정) --
+# 레시피와 재료·조리 단계를 생성
     @staticmethod
-    async def get_user_tool_ids(
+    async def create(
         db: AsyncSession,
-        user_id: int
-    ) -> list[int]:
+        user_id: int,
+        data: RecipeCreate,
+    ) -> Recipe:
+        recipe_data = data.model_dump(exclude={"ingredients", "steps"})
 
-        # 사용자 조리도구 테이블
-        my_tools_t = table(
-            "my_tools",
-            column("user_id"),
-            column("tool_id")
+        recipe = Recipe(user_id=user_id, **recipe_data)
+        db.add(recipe)
+        await db.flush()  # 생성된 recipe_id 사용
+
+        db.add_all([
+            RecipeIngredient(
+                recipe_id=recipe.recipe_id,
+                ing_id=item.ing_id,
+                amount_text=item.amount_text,
+            )
+            for item in data.ingredients
+        ])
+
+        db.add_all([
+            RecipeStep(
+                recipe_id=recipe.recipe_id,
+                step_no=item.step_no,
+                step_content=item.step_content,
+                step_image_url=item.step_image_url,
+            )
+            for item in data.steps
+        ])
+
+        await db.flush()
+        return recipe
+
+    # 요청에 포함된 기본 정보만 수정하고, 보낸 재료·단계 목록은 교체
+    @staticmethod
+    async def update_by_id(
+        db: AsyncSession,
+        recipe_id: int,
+        data: RecipeUpdate,
+    ) -> Recipe | None:
+        recipe = await db.get(Recipe, recipe_id)
+        if recipe is None:
+            return None
+
+        changes = data.model_dump(exclude_unset=True)
+        ingredients = changes.pop("ingredients", None)
+        steps = changes.pop("steps", None)
+
+        for key, value in changes.items():
+            setattr(recipe, key, value)
+
+        if ingredients is not None:
+            result = await db.execute(
+                select(RecipeIngredient).where(
+                    RecipeIngredient.recipe_id == recipe_id
+                )
+            )
+            for item in result.scalars().all():
+                await db.delete(item)
+
+            db.add_all([
+                RecipeIngredient(
+                    recipe_id=recipe_id,
+                    ing_id=item["ing_id"],
+                    amount_text=item["amount_text"],
+                )
+                for item in ingredients
+            ])
+
+        if steps is not None:
+            result = await db.execute(
+                select(RecipeStep).where(
+                    RecipeStep.recipe_id == recipe_id
+                )
+            )
+            for step in result.scalars().all():
+                await db.delete(step)
+
+            db.add_all([
+                RecipeStep(
+                    recipe_id=recipe_id,
+                    step_no=step["step_no"],
+                    step_content=step["step_content"],
+                    step_image_url=step["step_image_url"],
+                )
+                for step in steps
+            ])
+
+        await db.flush()
+        return recipe
+
+    # 레시피와 연결된 재료·단계·좋아요·북마크·댓글도 삭제
+    @staticmethod
+    async def delete_by_id(
+        db: AsyncSession,
+        recipe_id: int,
+    ) -> bool:
+        recipe = await db.get(Recipe, recipe_id)
+        if recipe is None:
+            return False
+
+        related_models = (
+            RecipeIngredient,
+            RecipeStep,
+            RecipeLike,
+            Bookmark,
+            RecipeComment,
         )
 
-        # 해당 사용자가 보유한 도구 ID 조회
-        stmt = select(my_tools_t.c.tool_id).where(
-            my_tools_t.c.user_id == user_id
-        )
+        for model in related_models:
+            result = await db.execute(
+                select(model).where(model.recipe_id == recipe_id)
+            )
+            for item in result.scalars().all():
+                await db.delete(item)
 
-        result = await db.execute(stmt)
-
-        # 조회한 도구 ID들을 리스트로 반환
-        return list(result.scalars().all())
+        await db.delete(recipe)
+        await db.flush()
+        return True

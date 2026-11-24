@@ -3,21 +3,23 @@
 //   1. 가운데 흰 카드(최대 440px), 입력칸 옆 버튼은 회색 알약, 변경 버튼은 포인트색
 //   2. 오류: 인라인 style(color: red) → 연한 빨간 상자, 안내 문구는 흐린 글씨
 //   3. 입력칸에 aria-label 추가 (라벨이 없어서 화면 읽기 프로그램이 이름을 몰랐음)
-
+// C:\Team-Be-happy-in-the-shade\frontend\src\pages\EmailAuthExample.jsx
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 
-import { mockUser } from '../mockData'; 
+import api from "../api";
 import { PASSWORD_MIN } from '../constants'; 
 
 // 토큰, 비동기 요청
+// 이메일 인증, 비밀번호 착기 회면 쪽 가벼운
 
+// API 추가
+//	POST /auth/send-code 인증번호 받기
+// POST /auth/verify-code 인증번호 확인
+// POST /auth/reset-password 새 비밀번호 저장
 
 export default function ResetPasswordPage() {
 
-  // 테스트용 데이터: DB 연결 후 가입 여부 확인·인증번호 검증은 API로 교체
-  const user = mockUser;
-  const verificationCode = '123456';
 
   // 현재 진행 단계
   const [step, setStep] = useState('verify');
@@ -31,6 +33,16 @@ export default function ResetPasswordPage() {
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
 
+
+  const errorText = (err) => {
+    const detail = err.response?.data?.detail;
+
+    if (Array.isArray(detail)) {
+      return detail.map((item) => item.msg).join(', ');
+    }
+
+    return detail ?? '요청에 실패했습니다. 다시 시도해 주세요.';
+  };
 
   // 입력값 변경
   const update = (field, value) => {
@@ -51,7 +63,7 @@ export default function ResetPasswordPage() {
   };
 
   // 인증번호 발송
-  const handleSendCode = () => {
+  const handleSendCode = async () => {
     const email = form.email.trim();
 
     setError('');
@@ -59,62 +71,93 @@ export default function ResetPasswordPage() {
     setSentEmail('');
     setVerifiedEmail('');
 
-    // mock에 등록된 이메일인지 확인
-    if (email !== user.email) {
-      setError(`mock 등록된 이메일이 없습니다. 임시: ${user.email}`);
+    if (!email) {
+      setError('이메일을 입력해 주세요.');
       return;
     }
 
-    setSentEmail(email);
-    setForm((prev) => ({ ...prev, code: '' }));
-    setMessage(`테스트 인증번호는 ${verificationCode}입니다. 실제 메일은 발송되지 않습니다.`);
+    try {
+      const { data } = await api.post('/auth/send-code', { email });
 
-    // 백엔드 연결 시: 이메일 발송 API로 교체
+      setSentEmail(email);
+      setForm((prev) => ({ ...prev, code: '' }));
+      setMessage(data.message);
+    } catch (err) {
+      setError(errorText(err));
+    }
   };
 
   // 인증번호 확인
-  const handleVerifyCode = () => {
+  const handleVerifyCode = async () => {
+    const email = form.email.trim();
+
     setError('');
     setMessage('');
 
-    if (!sentEmail || sentEmail !== form.email.trim()) {
-      setError('인증번호를 먼저 요청해주세요.');
+    if (!sentEmail || sentEmail !== email) {
+      setError('먼저 이 이메일로 인증번호를 받아 주세요.');
       return;
     }
 
-    if (form.code.trim() !== verificationCode) {
-      setError('인증번호가 일치하지 않습니다.');
-      return;
+    try {
+      const { data } = await api.post('/auth/verify-code', {
+        email,
+        code: form.code.trim(),
+      });
+
+      setVerifiedEmail(email);
+      setStep('reset');
+      setMessage(data.message);
+    } catch (err) {
+      setError(errorText(err));
     }
-
-    setVerifiedEmail(sentEmail);
-    setStep('reset');
-
-    // 백엔드 연결 시: 인증번호 검증 API로 교체
   };
 
-  // 비밀번호 변경
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    setError('');
 
-    if (!verifiedEmail || verifiedEmail !== form.email.trim()) {
-      setError('이메일 인증이 필요합니다.');
+  // 새 비밀번호 저장
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+
+    setError('');
+    setMessage('');
+
+    const email = form.email.trim();
+
+    if (!verifiedEmail || verifiedEmail !== email) {
+      setError('이메일 인증을 먼저 완료해 주세요.');
+      setStep('verify');
       return;
     }
 
     if (form.password.length < PASSWORD_MIN) {
-      setError(`비밀번호는 ${PASSWORD_MIN}자 이상 입력해주세요.`);
+      setError(`비밀번호를 ${PASSWORD_MIN}자 이상 입력해 주세요.`);
       return;
     }
 
     if (form.password !== form.confirmPassword) {
-      setError('비밀번호가 일치하지 않습니다.');
+      setError('비밀번호가 서로 일치하지 않습니다.');
       return;
     }
 
-    //DB 연결 후 비밀번호 변경 API 요청 및 성공 처리
-    window.alert('비밀번호 변경 기능은 DB 연결 후 제공될 예정입니다.');
+    try {
+      const { data } = await api.post('/auth/reset-password', {
+        email,
+        new_password: form.password,
+      });
+
+      setMessage(data.message);
+      setStep('verify');
+      setSentEmail('');
+      setVerifiedEmail('');
+      setForm((prev) => ({
+        ...prev,
+        code: '',
+        password: '',
+        confirmPassword: '',
+      }));
+    } catch (err) {
+      setError(errorText(err));
+    }
   };
 
   const rowClass = "flex gap-2";
