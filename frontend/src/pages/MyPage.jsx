@@ -181,8 +181,9 @@ const MyPage = () => {
       <div className="grid items-start gap-6 md:grid-cols-[260px_1fr]">
       <aside className="flex flex-col gap-4 rounded-card bg-surface p-6 shadow-card">
         <div className="flex flex-col items-center gap-1 border-b border-line pb-5 text-center">
-          {user.profile_image_url ? (
-            <img src={user.profile_image_url} alt="내 프로필" className="mb-2 h-20 w-20 rounded-full object-cover" />
+          {/* [수정 11/24 조현기 2차] profile_image_url → profile_image (서버 · DB 이름. 원래 이름이 달라서 사진이 안 보였음) */}
+          {user.profile_image ? (
+            <img src={user.profile_image} alt="내 프로필" className="mb-2 h-20 w-20 rounded-full object-cover" />
           ) : <span className="mb-2 flex h-20 w-20 items-center justify-center rounded-full bg-gray-200 text-2xl font-black text-ink-soft">{user.nickname?.slice(0, 1) || '나'}</span>}
           <strong className="text-lg">{user.nickname}</strong>
           <span className="text-sm text-muted">오늘도 맛있는 하루</span>

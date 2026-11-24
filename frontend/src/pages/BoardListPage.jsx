@@ -106,9 +106,10 @@ export default function BoardListPage() {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-black text-ink">커뮤니티</h1>
         {/* 글쓰기 버튼 */}
+        {/* [수정 11/24 조현기] 글자 넘침: whitespace-nowrap flex-none → '✏️ 글쓰기'가 한 줄 그대로 */}
         <button
           onClick={() => navigate('/board/new')}
-          className="bg-accent hover:bg-accent-dark text-white font-medium px-4 py-2 rounded-pill text-sm flex items-center gap-1.5 transition-colors"
+          className="bg-accent hover:bg-accent-dark text-white font-medium px-4 py-2 rounded-pill text-sm flex flex-none items-center gap-1.5 whitespace-nowrap transition-colors"
         >
           <span>✏️</span> 글쓰기
         </button>
@@ -134,11 +135,13 @@ export default function BoardListPage() {
         </div>
 
         {/* 검색 폼 (BOARD_SEARCH_TYPES 상수 기반 동적 렌더링) */}
+        {/* [수정 11/24 조현기] 글자 넘침: 좁은 화면에서 버튼이 눌려 글자가 쪼개지던 것 → 버튼은 whitespace-nowrap flex-none(줄바꿈 · 줄어듦 없음), 입력칸은 min-w-0(남는 만큼만) */}
+        {/*   원래 휴대폰 폭(390px 이하)에서 검색칸이 기본 폭을 고집해 [검색] 버튼이 '검/색'으로 쪼개지고 화면이 옆으로 밀렸음 */}
         <form onSubmit={handleSearchSubmit} className="flex gap-2">
           <select
             value={searchType}
             onChange={(e) => setSearchType(e.target.value)}
-            className="border rounded-pill px-2.5 py-1.5 text-sm bg-white text-gray-700 border-gray-300 focus:outline-none focus:ring-2 focus:ring-accent"
+            className="flex-none border rounded-pill px-2.5 py-1.5 text-sm bg-white text-gray-700 border-gray-300 focus:outline-none focus:ring-2 focus:ring-accent"
           >
             {BOARD_SEARCH_TYPES.map((type) => (
               <option key={type.value} value={type.value}>
@@ -151,11 +154,11 @@ export default function BoardListPage() {
             placeholder="검색어를 입력하세요"
             value={searchKeyword}
             onChange={(e) => setSearchKeyword(e.target.value)}
-            className="border rounded-pill px-3 py-1.5 text-sm flex-1 sm:w-48 border-gray-300 focus:outline-none focus:ring-2 focus:ring-accent"
+            className="min-w-0 border rounded-pill px-3 py-1.5 text-sm flex-1 sm:w-48 border-gray-300 focus:outline-none focus:ring-2 focus:ring-accent"
           />
           <button
             type="submit"
-            className="bg-accent text-white px-3.5 py-1.5 rounded-pill text-sm font-medium hover:bg-accent-dark transition-colors"
+            className="flex-none whitespace-nowrap bg-accent text-white px-3.5 py-1.5 rounded-pill text-sm font-medium hover:bg-accent-dark transition-colors"
           >
             검색
           </button>

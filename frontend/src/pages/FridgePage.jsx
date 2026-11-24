@@ -243,7 +243,8 @@ function FridgePage() {
                 <h2 id="fridge-recommend-title" className="text-lg font-black text-have">
                   지금 만들 수 있는 요리{recipes.length > 0 && ` ${recipes.length}`}
                 </h2>
-                <button disabled={isRecommending || isSaving} onClick={getRecommendations} className="h-9 rounded-pill bg-have px-4 text-sm font-bold text-white disabled:opacity-40">{isRecommending ? "확인 중..." : recipes.length ? "다시 확인" : "추천 확인"}</button>
+                {/* [수정 11/24 조현기] 글자 넘침: 아주 좁은 화면(320px)에서 '추천 확인'이 두 줄로 쪼개지던 것 → whitespace-nowrap flex-none */}
+                <button disabled={isRecommending || isSaving} onClick={getRecommendations} className="h-9 flex-none whitespace-nowrap rounded-pill bg-have px-4 text-sm font-bold text-white disabled:opacity-40">{isRecommending ? "확인 중..." : recipes.length ? "다시 확인" : "추천 확인"}</button>
               </div>
               <p className="text-xs text-have">내 냉장고 재료 50% 이상 일치</p>
               {recommendMessage && <p role="status" className="text-sm text-ink-soft">{recommendMessage}</p>}
@@ -285,7 +286,7 @@ function FridgePage() {
             </select>
             <button disabled={!selectedTool || isSaving} className={mainButton}>도구 추가</button>
           </form>
-          <ul className="grid grid-cols-2 md:grid-cols-4 gap-3">{tools.map((tool) => <li key={tool.user_tool_id} className="rounded-[20px] bg-gray-50 px-5 py-4 flex items-center justify-between gap-3"><span className="font-bold">{tool.tool_name}</span><button aria-label={`${tool.tool_name} 삭제`} disabled={isSaving} onClick={() => deleteTool(tool)} className="text-sm text-muted underline hover:text-miss">삭제</button></li>)}</ul>
+          <ul className="grid grid-cols-2 md:grid-cols-4 gap-3">{tools.map((tool) => <li key={tool.user_tool_id} className="rounded-[20px] bg-gray-50 px-5 py-4 flex items-center justify-between gap-3">{/* [수정 11/24 조현기] 글자 넘침: 도구 이름이 길면 '삭제'가 '삭/제'로 쪼개지던 것 → 이름은 min-w-0 truncate(넘치면 …), '삭제'는 whitespace-nowrap flex-none */}<span className="min-w-0 truncate font-bold">{tool.tool_name}</span><button aria-label={`${tool.tool_name} 삭제`} disabled={isSaving} onClick={() => deleteTool(tool)} className="flex-none whitespace-nowrap text-sm text-muted underline hover:text-miss">삭제</button></li>)}</ul>
           {!tools.length && <p className="text-muted">등록한 조리도구가 없습니다.</p>}
         </section>}
       </>}

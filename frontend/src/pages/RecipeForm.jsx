@@ -380,17 +380,19 @@ function RecipeForm({ initialData = null }) {
             }}
           />
         </label>
-        <div className="flex flex-col gap-2">
+        {/* [수정 11/24 조현기] 글자 넘침: 좁은 휴대폰(360px 이하)에서 제목 · 소개 입력칸이 카드 밖으로 50px 삐져나가던 것
+            min-w-0: 칸이 카드 폭보다 커지지 않게 · w-full: 입력칸은 칸 폭에 맞춤 */}
+        <div className="flex min-w-0 flex-col gap-2">
           <label htmlFor="recipe-title" className="text-sm font-bold">제목 *</label>
           <input id="recipe-title" placeholder="요리 이름 입력" value={form.recipe_title}
-            maxLength={RECIPE_TITLE_MAX} className="h-12 text-lg"
+            maxLength={RECIPE_TITLE_MAX} className="h-12 w-full min-w-0 text-lg"
             onChange={(e) => update('recipe_title', e.target.value)}
             required
           />
           <label htmlFor="recipe-intro" className="mt-3 text-sm text-muted">
             + 한 줄 소개 (선택)
           </label>
-          <input id="recipe-intro" placeholder="이 요리를 소개해 주세요" value={form.intro} maxLength={RECIPE_INTRO_MAX} className="h-12"
+          <input id="recipe-intro" placeholder="이 요리를 소개해 주세요" value={form.intro} maxLength={RECIPE_INTRO_MAX} className="h-12 w-full min-w-0"
             onChange={(e) => update('intro', e.target.value)}
           />
         </div>

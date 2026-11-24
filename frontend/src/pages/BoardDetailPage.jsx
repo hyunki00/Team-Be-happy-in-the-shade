@@ -371,7 +371,9 @@ function formatBoardDate(dateValue) {
             </h3>
 
             {/* 댓글 입력 폼 */}
-            <form onSubmit={handleAddComment} className="flex gap-2 mb-6">
+            {/* [수정 11/24 조현기] 글자 넘침: 휴대폰 폭에서 [등록]이 '등/록'으로 쪼개지던 것
+                입력칸 min-w-0(남는 만큼만) · 글자 수와 버튼은 whitespace-nowrap flex-none · items-center로 높이 맞춤 */}
+            <form onSubmit={handleAddComment} className="flex items-center gap-2 mb-6">
               <input
                 type="text"
                 placeholder={isAuthenticated ? "댓글을 입력하세요 (최대 500자)" : "로그인 후 댓글을 남겨보세요"}
@@ -379,16 +381,16 @@ function formatBoardDate(dateValue) {
                 maxLength={COMMENT_MAX}
                 disabled={!isAuthenticated}
                 onChange={(e) => setNewComment(e.target.value)}
-                className="flex-1 border rounded-pill px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent disabled:bg-gray-100"
+                className="min-w-0 flex-1 border rounded-pill px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent disabled:bg-gray-100"
               />
               {/* 실시간 댓글 글자수 카운터 / 제한 수  추가*/}
-              <span className="text-xs text-gray-400">
+              <span className="flex-none whitespace-nowrap text-xs text-gray-400">
                 {newComment.length} / {COMMENT_MAX}자
               </span>
               <button
                 type="submit"
                 disabled={!isAuthenticated || !newComment.trim()}
-                className="bg-accent text-white px-4 py-2 rounded-pill text-sm font-medium hover:bg-accent-dark transition-colors disabled:bg-gray-300"
+                className="flex-none whitespace-nowrap bg-accent text-white px-4 py-2 rounded-pill text-sm font-medium hover:bg-accent-dark transition-colors disabled:bg-gray-300"
               >
                 등록
               </button>

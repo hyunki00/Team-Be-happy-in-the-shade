@@ -8,11 +8,16 @@
 //   흐름: 글자 수 확인(원래 코드) → PATCH /users/me { nickname } → 성공하면 setUser(새 내 정보) + 초록 안내
 //   - 다른 사람과 겹치는 닉네임이면 서버가 400 "이미 사용 중인 닉네임입니다." → 빨간 상자에 그대로 표시
 //   - setUser: AuthContext의 로그인 정보를 바꿈 → 위 메뉴 · 마이페이지 왼쪽 프로필도 바로 새 닉네임
-//   - 사진은 업로드 방식을 팀에서 아직 정하지 않아 지금처럼 미리보기까지만 (저장 안 됨)
-//     사진을 바꾸고 저장하면 '사진 저장은 준비 중이에요' 안내를 같이 띄움
-import { useEffect, useRef, useState } from 'react';
+// [수정 11/24 조현기 2차] 프로필 사진도 저장
+//   원래: FileReader로 사진을 긴 글자(data:…)로 바꿔 미리보기만 하고 저장하지 않았음
+//         + 화면은 profile_image_url이라는 이름을 썼는데 DB · 서버 이름은 profile_image라서 저장해도 못 읽었음
+//   지금: ① 사진을 고르면 바로 서버에 올림(uploadImage → POST /images) → 돌려받은 주소로 미리보기
+//         ② '변경하기'를 누르면 PATCH /users/me { nickname, profile_image } 로 닉네임과 사진 주소를 같이 저장
+//         ③ '사진 삭제' 후 저장하면 profile_image: null → 사진 없음(닉네임 첫 글자 동그라미)
+//         이름은 모두 DB 그대로 profile_image (MyPage 왼쪽 · 위 메뉴 동그라미도 같은 이름으로 읽음)
+import { useRef, useState } from 'react';   // [수정 11/24 조현기 2차] useEffect는 FileReader 정리용이라 뺌
 import { IMAGE_MAX_MB, IMAGE_TYPES, NICKNAME_MAX, NICKNAME_MIN } from '../../constants';
-import api from '../../api';
+import api, { uploadImage } from '../../api';   // [수정 11/24 조현기 2차] uploadImage: 사진 올리기
 import { useAuth } from '../../contexts/AuthContext';
 
 function ProfileEditor({ user }) {
@@ -20,17 +25,14 @@ function ProfileEditor({ user }) {
   // 입력 상태·검증·이미지 미리보기는 DB 연결 후에도 사용
   const [formData, setFormData] = useState({
     nickname: user?.nickname ?? '',
-    profile_image_url: user?.profile_image_url ?? null,
+    profile_image: user?.profile_image ?? null,   // [수정 11/24 조현기 2차] profile_image_url → profile_image (DB 이름)
   });
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
-  const [isReading, setIsReading] = useState(false);
+  const [isReading, setIsReading] = useState(false);   // [수정 11/24 조현기 2차] 지금은 '사진 올리는 중'이라는 뜻으로 씀
   const [isSaving, setIsSaving] = useState(false);   // [수정 11/24 조현기] 저장 중이면 true → 버튼 잠금 (두 번 눌러 두 번 저장되는 것 막기)
   const { setUser } = useAuth();                     // [수정 11/24 조현기] 저장 후 로그인 정보(user)를 새 값으로 바꾸는 함수
   const fileInputRef = useRef(null);
-  const readerRef = useRef(null);
-
-  useEffect(() => () => readerRef.current?.abort(), []);
 
   const handleChange = (e) => {
     setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
@@ -38,13 +40,12 @@ function ProfileEditor({ user }) {
     setMessage('');
   };
 
-  const handleImageChange = (e) => {
+  // [수정 11/24 조현기 2차] async: 사진을 서버에 올리고 기다려야 해서
+  const handleImageChange = async (e) => {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
 
-    readerRef.current?.abort();
-    setIsReading(false);
     setMessage('');
     if (!IMAGE_TYPES.includes(file.type)) {
       setError('JPG, PNG, WEBP 사진만 선택할 수 있습니다.');
@@ -55,26 +56,24 @@ function ProfileEditor({ user }) {
       return;
     }
 
-    // mock에서는 사진을 메모리에 보관한다. 실제 업로드 시 원본 파일을 전송한다.
-    const reader = new FileReader();
-    readerRef.current = reader;
+    // [수정 11/24 조현기 2차] 원래: FileReader로 미리보기만 (mock) → 지금: 서버에 올리고 진짜 주소로 미리보기
+    //   아직 저장 전이라 '변경하기'를 눌러야 내 정보에 들어감 (취소하면 원래 사진으로)
     setError('');
     setIsReading(true);
-    reader.onload = () => {
-      setFormData((prev) => ({ ...prev, profile_image_url: reader.result }));
+    try {
+      const url = await uploadImage(file);
+      setFormData((prev) => ({ ...prev, profile_image: url }));
+    } catch (err) {
+      const detail = err.response?.data?.detail;
+      setError(typeof detail === 'string' ? detail : '사진을 올리지 못했습니다. 다시 선택해 주세요.');
+    } finally {
       setIsReading(false);
-    };
-    reader.onerror = () => {
-      setError('사진을 읽지 못했습니다. 다시 선택해 주세요.');
-      setIsReading(false);
-    };
-    reader.readAsDataURL(file);
+    }
   };
 
+  // [수정 11/24 조현기 2차] 사진 삭제: 미리보기에서 빼고, '변경하기'를 누르면 profile_image: null로 저장
   const handleImageDelete = () => {
-    readerRef.current?.abort();
-    setIsReading(false);
-    setFormData((prev) => ({ ...prev, profile_image_url: null }));
+    setFormData((prev) => ({ ...prev, profile_image: null }));
     setError('');
     setMessage('');
   };
@@ -94,11 +93,10 @@ function ProfileEditor({ user }) {
     setMessage('');
     setIsSaving(true);
     try {
-      const { data } = await api.patch('/users/me', { nickname });
+      // [수정 11/24 조현기 2차] 닉네임 + 사진 주소를 같이 저장 (사진이 없으면 null → 사진 지움)
+      const { data } = await api.patch('/users/me', { nickname, profile_image: formData.profile_image });
       setUser(data);
-      // 사진을 바꿨는지 (바꿨어도 저장은 안 되니 안내를 다르게)
-      const photoChanged = formData.profile_image_url !== (user.profile_image_url ?? null);
-      setMessage(photoChanged ? '닉네임을 바꿨어요. (사진 저장은 준비 중이에요)' : '닉네임을 바꿨어요.');
+      setMessage('프로필을 저장했어요.');
     } catch (err) {
       const detail = err.response?.data?.detail;
       setError(typeof detail === 'string' ? detail : '저장하지 못했어요. 잠시 후 다시 시도해 주세요.');
@@ -109,11 +107,9 @@ function ProfileEditor({ user }) {
 
   //  저장 전 입력만 원래 값으로 복원
   const handleCancel = () => {
-    readerRef.current?.abort();
-    setIsReading(false);
     setFormData({
       nickname: user.nickname,
-      profile_image_url: user.profile_image_url ?? null,
+      profile_image: user.profile_image ?? null,   // [수정 11/24 조현기 2차] 저장된 사진으로 되돌림
     });
     setError('');
     setMessage('');
@@ -129,16 +125,16 @@ function ProfileEditor({ user }) {
       <h2 className="text-xl font-black">프로필 수정</h2>
       <form onSubmit={handleSubmit} className="mt-6 flex max-w-[400px] flex-col gap-5">
         <div className="flex flex-wrap items-center gap-3">
-          {formData.profile_image_url ? (
-            <img src={formData.profile_image_url} alt="프로필 미리보기"
+          {formData.profile_image ? (
+            <img src={formData.profile_image} alt="프로필 미리보기"
               width={120} height={120} className="h-[120px] w-[120px] rounded-full object-cover" />
           ) : <p className="flex h-[120px] w-[120px] items-center justify-center rounded-full bg-gray-100 p-4 text-center text-xs text-muted">프로필 사진이 없습니다.</p>}
           <input ref={fileInputRef} type="file" accept={IMAGE_TYPES.join(',')}
             aria-label="프로필 사진 선택" onChange={handleImageChange} hidden />
           <button type="button" className="h-10 rounded-pill bg-gray-100 px-4 text-sm font-medium hover:bg-gray-200 disabled:opacity-40" onClick={() => fileInputRef.current.click()}>사진 변경</button>
           <button type="button" className="h-10 rounded-pill bg-gray-100 px-4 text-sm font-medium hover:bg-gray-200 disabled:opacity-40" onClick={handleImageDelete}
-            disabled={!formData.profile_image_url && !isReading}>사진 삭제</button>
-          {isReading && <p role="status" className="w-full text-sm text-muted">사진을 불러오는 중입니다.</p>}
+            disabled={!formData.profile_image && !isReading}>사진 삭제</button>
+          {isReading && <p role="status" className="w-full text-sm text-muted">사진을 올리는 중입니다.</p>}
         </div>
 
         <div className="flex flex-col gap-1">

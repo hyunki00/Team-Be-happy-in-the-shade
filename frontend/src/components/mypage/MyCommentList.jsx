@@ -23,11 +23,13 @@ function MyCommentList({ comments, onDelete }) {
     <section>
       <h2 className="text-xl font-black">내 댓글</h2>
 
-      <div role="group" aria-label="댓글 종류" className="mt-4 flex gap-2">
-        <button type="button" aria-pressed={activeTab === 'recipe'} className={`h-10 rounded-pill px-4 text-sm font-bold ${activeTab === 'recipe' ? "bg-ink text-white" : "bg-gray-100 hover:bg-gray-200"}`} onClick={() => setActiveTab('recipe')}>
+      {/* [수정 11/24 조현기] 글자 넘침: 아주 좁은 화면(320px)에서 탭 글자가 두 줄로 쪼개지던 것
+          탭은 whitespace-nowrap(한 줄), 자리가 모자라면 탭이 다음 줄로 내려가게 flex-wrap */}
+      <div role="group" aria-label="댓글 종류" className="mt-4 flex flex-wrap gap-2">
+        <button type="button" aria-pressed={activeTab === 'recipe'} className={`h-10 whitespace-nowrap rounded-pill px-4 text-sm font-bold ${activeTab === 'recipe' ? "bg-ink text-white" : "bg-gray-100 hover:bg-gray-200"}`} onClick={() => setActiveTab('recipe')}>
           레시피 댓글 {comments.filter((comment) => comment.targetType === 'recipe').length}
         </button>
-        <button type="button" aria-pressed={activeTab === 'post'} className={`h-10 rounded-pill px-4 text-sm font-bold ${activeTab === 'post' ? "bg-ink text-white" : "bg-gray-100 hover:bg-gray-200"}`} onClick={() => setActiveTab('post')}>
+        <button type="button" aria-pressed={activeTab === 'post'} className={`h-10 whitespace-nowrap rounded-pill px-4 text-sm font-bold ${activeTab === 'post' ? "bg-ink text-white" : "bg-gray-100 hover:bg-gray-200"}`} onClick={() => setActiveTab('post')}>
           커뮤니티 댓글 {comments.filter((comment) => comment.targetType === 'post').length}
         </button>
       </div>
