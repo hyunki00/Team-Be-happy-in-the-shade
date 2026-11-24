@@ -10,6 +10,8 @@
 import RecipeCard from "../components/RecipeCard";
 import { useState, useEffect } from "react";
 import { useAuth } from "../contexts/AuthContext"
+import { Link } from "react-router-dom";
+import { RECIPE_CATEGORIES } from "../constants";
 import api from "../api"; // [병합] 공통 api
 
 function RecipeListPage() {
@@ -20,7 +22,7 @@ function RecipeListPage() {
     r_category_id: null, //요리 종류
     level: null, //요리 난이도
     cooking_time: null, //조리 시간
-    sort: "name", //정렬
+    sort: "latest", //정렬 (기본값: 최신순)
   });  
 
   // 백엔드에서 조회한 현재 페이지의 레시피 목록
@@ -34,6 +36,10 @@ function RecipeListPage() {
 
   // 실제 DB에서 가져온 식재료 목록
   const [ingredients, setIngredients] = useState([]);
+
+  // 내 냉장고에 등록된 재료 개수
+  // null은 아직 조회하지 않았다는 뜻
+  const [fridgeIngredientCount, setFridgeIngredientCount] = useState(null);
 
   // 실제 DB에서 가져온 식재료 카테고리
   const [ingredientCategories, setIngredientCategories] = useState([]);
@@ -106,6 +112,16 @@ function RecipeListPage() {
           params.append("ingredient_ids", ingId);
         });
 
+        // 최신순 / 인기순 정렬은 백엔드에서 처리
+        if (filters.sort === "latest" || filters.sort === "popular") {
+          params.append("sort", filters.sort);
+        }
+
+        // 냉장고 우선 스위치가 켜져 있으면 서버에 전달
+        if (isAllIngredientsOn) {
+          params.append("fridge_first", "true");
+        }
+
         // 화면에는 20개를 보여주지만 21개를 요청해 다음 페이지 존재 여부 확인
         params.append("limit", PAGE_SIZE + 1);
         params.append("offset", (page - 1) * PAGE_SIZE);
@@ -147,6 +163,8 @@ function RecipeListPage() {
     filters.level,
     filters.cooking_time,
     filters.ingredients,
+    filters.sort, // 정렬 방식이 변경되면 API 다시 호출
+    isAllIngredientsOn,
     page
   ]);
 
@@ -179,6 +197,38 @@ function RecipeListPage() {
     }
   }, [isAuthenticated]);
 
+  // 냉장고 우선 검색을 켜면 내 냉장고 재료 개수 조회
+  useEffect(() => {
+    if (!isAuthenticated || !isAllIngredientsOn) {
+      setFridgeIngredientCount(null);
+      return;
+    }
+
+    const controller = new AbortController();
+
+    const fetchFridgeIngredients = async () => {
+      setFridgeIngredientCount(null);
+
+      try {
+        const { data } = await api.get("/fridge/ingredients", {
+          signal: controller.signal,
+        });
+
+        if (!controller.signal.aborted) {
+          setFridgeIngredientCount(data.length);
+        }
+      } catch (err) {
+        if (err.code !== "ERR_CANCELED") {
+          console.error("냉장고 재료 조회 실패:", err);
+        }
+      }
+    };
+
+    fetchFridgeIngredients();
+
+    return () => controller.abort();
+  }, [isAuthenticated, isAllIngredientsOn]);
+
   // 검색 조건 변경 시 1페이지부터 다시 조회
   useEffect(() => {
     setPage(1);
@@ -187,7 +237,9 @@ function RecipeListPage() {
     filters.r_category_id,
     filters.level,
     filters.cooking_time,
-    filters.ingredients
+    filters.ingredients,
+    filters.sort,       // 추가: 정렬 방식 변경
+    isAllIngredientsOn  // 추가: 냉장고 우선 검색 ON/OFF
   ]);
 
   // 검색 조건은 백엔드에서 적용되므로 응답받은 목록을 그대로 사용
@@ -196,15 +248,21 @@ function RecipeListPage() {
   // 정렬에 사용할 레시피 목록
   const recipesWithMatch = filteredRecipes;
 
-  // 정렬 기준에 따라 가나다순 또는 일치율순 정렬
+  // 정렬 기준에 따라 레시피 정렬
   const sortedRecipes = [...recipesWithMatch].sort((a, b) => {
-    // 재료를 선택했거나 일치율순을 선택했다면
-    if (filters.ingredients.length > 0 || filters.sort === "match_rate") {
+
+    // 냉장고 우선 검색은 백엔드 정렬 순서를 유지
+    if (isAllIngredientsOn) {
+      return 0;
+    }
+
+    // 일치율 높은 순을 선택한 경우
+    if (filters.sort === "match_rate") {
       return (b.match_rate ?? 0) - (a.match_rate ?? 0);
     }
 
-    // 그 외에는 가나다순
-    return a.recipe_title.localeCompare(b.recipe_title, "ko");
+    // 최신순 / 인기순은 백엔드 정렬 순서를 유지
+    return 0;
   });
 
   // 식재료 선택 및 선택 해제
@@ -294,7 +352,10 @@ function RecipeListPage() {
     }`;
 
   // 왼쪽 필터에 보여 줄 값 (값은 기존 select와 같음)
-  const CATEGORY_OPTIONS = [{ value: 1, label: "밥" }, { value: 4, label: "반찬" }];
+  const CATEGORY_OPTIONS = RECIPE_CATEGORIES.map((category) => ({
+    value: category.r_category_id,
+    label: category.category_name,
+  }));
   const LEVEL_OPTIONS = ["초급", "중급", "고급"];
   const TIME_OPTIONS = [
     { value: 15, label: "~15분" },
@@ -442,13 +503,20 @@ function RecipeListPage() {
             {/* [병합] 켰을 때 안내. woojung 브랜치에서도 아직 검색 조건에 반영 전이라 '준비 중'으로 표시 */}
             {isAllIngredientsOn ? (
               <div className="basis-full flex flex-col gap-0.5 pl-16 text-sm text-have">
-                <p>내 냉장고 재료로 만들 수 있는 요리를 먼저 보여 주는 기능이에요.</p>
-                <p className="mt-1 self-start rounded-[8px] bg-surface px-2.5 py-1">
-                  지금은 준비 중이라 검색 결과에는 아직 반영되지 않아요.
+                <p>
+                  내 냉장고 재료와 50% 이상 일치하는 레시피를
+                  일치율 높은 순으로 보여드려요.
+                </p>
+                <p>
+                  일치율이 같으면 내 조리도구로 만들 수 있는 요리를 먼저 보여드려요.
                 </p>
               </div>
             ) : (
-              !isAuthenticated && <span className="text-sm text-muted">로그인하면 켤 수 있어요</span>
+              !isAuthenticated && (
+                <span className="text-sm text-muted">
+                  로그인하면 켤 수 있어요
+                </span>
+              )
             )}
           </div>
 
@@ -468,7 +536,8 @@ function RecipeListPage() {
                 })
               }
             >
-              <option value="name">가나다순</option>
+              <option value="latest">최신순</option>
+              <option value="popular">인기순</option>
               <option value="match_rate">일치율 높은 순</option>
             </select>
           </div>
@@ -478,7 +547,24 @@ function RecipeListPage() {
           {error && <p role="alert" className="rounded-[16px] bg-miss-soft px-5 py-3 text-miss">{error}</p>}
 
           {!loading && !error && filteredRecipes.length === 0 && (
-            <p className="rounded-card bg-surface p-8 text-center text-muted shadow-card">검색 결과가 없습니다.</p>
+            <div className="rounded-card bg-surface p-8 text-center text-muted shadow-card">
+              {isAllIngredientsOn && fridgeIngredientCount === 0 ? (
+                <>
+                  <p>냉장고에 등록된 재료가 없어요.</p>
+                  <p className="mt-2">
+                    재료를 등록하고 맞춤 레시피를 추천받아 보세요!
+                  </p>
+                  <Link
+                    to="/fridge"
+                    className="mt-4 inline-block rounded-pill bg-have px-5 py-2 font-bold text-white"
+                  >
+                    내 냉장고에 재료 등록하러 가기
+                  </Link>
+                </>
+              ) : (
+                <p>검색 결과가 없습니다.</p>
+              )}
+            </div>
           )}
 
           {/* ⑤ 결과 카드: 한 줄에 최대 3개 */}
@@ -488,7 +574,7 @@ function RecipeListPage() {
               <RecipeCard
                key={recipe.recipe_id}
                recipe={recipe}
-               showMatch={filters.ingredients.length > 0}
+               showMatch={filters.ingredients.length > 0 || isAllIngredientsOn}
               />
             ))}
           </div>

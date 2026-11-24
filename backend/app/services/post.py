@@ -219,9 +219,9 @@ class PostService:
                   raise
 
 
-      #게시글 좋아요 토글 (이미 눌렀으면 취소, 안 눌렀으면 추가)
+      ## 게시글 좋아요 추가 ##
       @staticmethod
-      async def toggle_like(db: AsyncSession, user_id: int, post_id: int) -> dict:
+      async def add_like(db: AsyncSession, user_id: int, post_id: int) -> dict:
             #로그인여부
             if not user_id:
                   raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="로그인이 필요합니다.")
@@ -234,18 +234,15 @@ class PostService:
             try:
                   # 현재 사용자가 해당 게시글에 좋아요 눌렀는지 조회
                   exists = (
-                  await db.execute(
-                        select(PostLike).where(PostLike.user_id == user_id, PostLike.post_id == post_id)
+                        await db.execute(
+                              select(PostLike).where(PostLike.user_id == user_id, PostLike.post_id == post_id)
                         )
                   ).scalar_one_or_none()
 
-                  # 이미 눌렀으면 취소(False), 안 눌렀으면 추가(True)
-                  if exists:
-                        await PostCrud.remove_like(db, user_id=user_id, post_id=post_id)
-                        is_liked = False
-                  else:
+                  
+                  if not exists:
                         await PostCrud.add_like(db, user_id=user_id, post_id=post_id)
-                        is_liked = True
+                  
 
                   await db.commit()
             except Exception:
@@ -256,8 +253,42 @@ class PostService:
             like_count = (
                   await db.execute(select(func.count(PostLike.user_id)).where(PostLike.post_id == post_id))
             ).scalar_one()
-            return {"post_id": post_id, "is_liked": is_liked, "like_count": like_count}
+            return {"post_id": post_id, "is_liked": True, "like_count": like_count}
 
+      ## 게시글 좋아요 취소 ##
+      @staticmethod
+      async def remove_like(db: AsyncSession, user_id: int, post_id: int) -> dict:
+            #로그인여부
+            if not user_id:
+                  raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="로그인이 필요합니다.")
+            
+            # 대상 게시글 존재여부
+            post = await PostCrud.get_by_id(db, post_id)
+            if not post:
+                  raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="게시글을 찾을 수 없습니다.")
+
+            try:
+                  # 현재 사용자가 해당 게시글에 좋아요 눌렀는지 조회
+                  exists = (
+                        await db.execute(
+                              select(PostLike).where(PostLike.user_id == user_id, PostLike.post_id == post_id)
+                        )
+                  ).scalar_one_or_none()
+
+                  # 누른 상태면 취소
+                  if exists:
+                        await PostCrud.remove_like(db, user_id=user_id, post_id=post_id)
+
+                  await db.commit()
+            except Exception:
+                  await db.rollback()
+                  raise
+
+            # 변경된 최종 좋아요 수 집계 후 결과 반환
+            like_count = (
+                  await db.execute(select(func.count(PostLike.user_id)).where(PostLike.post_id == post_id))
+            ).scalar_one()
+            return {"post_id": post_id, "is_liked": False, "like_count": like_count}
 
 
 

@@ -42,7 +42,8 @@ class RecipeCrud:
         db: AsyncSession,
         search=None,
         limit: int | None = 20,
-        offset: int = 0
+        offset: int = 0,
+        sort: str = "latest"
     ) -> list[Recipe]:
 
         #select(Recipe) : SELECT * FROM recipes;
@@ -77,10 +78,36 @@ class RecipeCrud:
                 )
 
         # 정렬
-        stmt = stmt.order_by(
-            Recipe.recipe_title.asc(),
-            Recipe.recipe_id.asc()
-        )
+        if sort == "popular":
+            # 레시피별 좋아요 개수를 계산하는 서브쿼리
+            like_counts = (
+                select(
+                    RecipeLike.recipe_id,
+                    func.count().label("like_count")
+                )
+                .group_by(RecipeLike.recipe_id)
+                .subquery()
+            )
+
+            # 좋아요가 없는 레시피도 포함
+            stmt = stmt.outerjoin(
+                like_counts,
+                Recipe.recipe_id == like_counts.c.recipe_id
+            )
+
+            # 좋아요 많은 순 → 작성일 최신순
+            stmt = stmt.order_by(
+                func.coalesce(like_counts.c.like_count, 0).desc(),
+                Recipe.created_at.desc(),
+                Recipe.recipe_id.desc()
+            )
+
+        else:
+            # 기본 정렬: 최신순
+            stmt = stmt.order_by(
+                Recipe.created_at.desc(),
+                Recipe.recipe_id.desc()
+            )
 
         # 필요한 경우에만 페이지 나누기
         if limit is not None:

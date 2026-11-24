@@ -1,5 +1,7 @@
 // 담당: 조현기
 // 모든 페이지 위에 보이는 메뉴 (시안 F: 화면 위에 떠 있는 둥근 흰 메뉴바)
+// [11/24 조현기] 왼쪽 로고: 팀 이름 → 사이트 이름 '뭐먹' 로고 그림 (frontend/public/logo.png)
+//   숟가락 · 포크 · 베이지 배경까지 넣은 그림, 양 끝은 메뉴바 흰 바탕으로 흐려지게 만듦 (높이 폰 48px · PC 56px)
 import { Link, NavLink } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 
@@ -28,8 +30,8 @@ function NavBar() {
   return (
     <header className="px-4 pt-4 pb-6 md:px-6 md:pt-6 md:pb-8">
       <div className="mx-auto max-w-6xl flex flex-wrap items-center gap-x-4 gap-y-1 rounded-[32px] bg-surface py-2 pl-5 pr-2 md:pl-6 shadow-float">
-        <Link to="/" className="text-lg font-black tracking-tight whitespace-nowrap">
-          그늘에있으면기분이해피하조
+        <Link to="/" className="flex-none" aria-label="뭐먹 홈으로">
+          <img src="/logo.png" alt="뭐먹" className="h-12 w-auto md:h-14" />
         </Link>
 
         {/* 좁은 화면에서는 메뉴가 다음 줄로 내려가고 4칸으로 나눠 한 줄에 보인다 */}

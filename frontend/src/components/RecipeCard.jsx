@@ -30,6 +30,12 @@ function RecipeCard({recipe, showMatch=false}) {
         <p className="text-sm text-muted">
           조리 시간 {recipe.cooking_time}분 · 난이도 {recipe.level} · {recipe.nickname}
         </p>
+        {/* 내 조리도구로 만들 수 있는 레시피 표시 */}
+        {recipe.can_cook_with_my_tools === true && (
+          <span className="self-start rounded-pill bg-have-soft px-3 py-1 text-xs font-bold text-have">
+            ✓ 내 도구로 가능
+          </span>
+        )}
         {showMatch && (
           <div className="mt-1 flex items-center gap-3">
             <div className="h-2 flex-1 overflow-hidden rounded-pill bg-gray-100">

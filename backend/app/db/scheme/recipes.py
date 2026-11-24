@@ -60,6 +60,9 @@ class RecipeListItem(BaseModel):
     missing_ingredients: list[MissingIngredient] = Field(default_factory=list)
     ingredient_ids: list[int] = Field(default_factory=list)
 
+    # 사용자의 레시피에 필요한 도구 보유 여부
+    can_cook_with_my_tools: bool = False # False : 도구가 없거나, 로그인하지 않았거나, 필요한 도구 정보가 없음
+
 
 # 레시피 상세의 식재료 하나
 class RecipeIngredientItem(BaseModel):

@@ -13,6 +13,7 @@
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
+from typing import Literal
 
 from app.core.auth import get_user_id, get_optional
 from app.db.database import get_db
@@ -44,7 +45,9 @@ async def get_recipes(
     offset: int = Query(default=0, ge=0),
     user_id: int | None = Depends(get_optional),
     db: AsyncSession = Depends(get_db),
-    over_60: bool = False
+    over_60: bool = False,
+    sort: Literal["latest", "popular"] = "latest",
+    fridge_first: bool = False
 ):
     # URL로 전달받은 검색 조건을 RecipeSearch 객체로 묶기
     search = RecipeSearch(
@@ -53,12 +56,13 @@ async def get_recipes(
         level=level,
         cooking_time=cooking_time,
         ingredient_ids=ingredient_ids,
-        over_60=over_60
+        over_60=over_60,
+        fridge_first=fridge_first
     )
 
     # 검색 조건에 맞는 레시피 목록을 서비스에서 조회
     return await RecipeService.search(
-        db, search, user_id, limit, offset
+        db, search, user_id, limit, offset, sort=sort
     )
 
 
