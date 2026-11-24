@@ -102,3 +102,53 @@ class RecipeSearch(BaseModel):
 
     # 조리 시간이 60분을 초과하는 레시피만 검색할지 여부
     over_60: bool = False
+
+
+# -- 오효정 추가 -- RecipeCreate / RecipeUpdate 
+
+
+# 레시피 등록·수정 요청에 사용하는 하위 항목(추가- 아래 RecipeUpdate에서 참고)
+class RecipeIngredientInput(BaseModel):
+    ing_id: int = Field(gt=0)
+    amount_text: str = Field(min_length=1, max_length=50)
+
+# 레시피 스텝 입력 (추가- 아래 RecipeUpdate에서 참고)
+class RecipeStepInput(BaseModel):
+    step_no: int = Field(ge=1)
+    step_content: str = Field(min_length=1)
+    step_image_url: str | None = Field(default=None, max_length=500)
+
+# 레시피 등록 요청
+class RecipeCreate(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    recipe_title: str = Field(min_length=1, max_length=50)
+    intro: str | None = Field(default=None, max_length=200)
+    image_url: str | None = Field(default=None, max_length=500)
+    servings: int = Field(default=1, ge=1, le=99)
+    tool_id: int | None = Field(default=None, gt=0)
+    level: str = Field(min_length=1, max_length=20)
+    cooking_time: int = Field(ge=1)
+    r_category_id: int = Field(gt=0)
+
+    ingredients: list[RecipeIngredientInput] = Field(min_length=1)
+    steps: list[RecipeStepInput] = Field(min_length=1)
+
+
+# 레시피 수정 요청: 보낸 필드만 수정할 수 있도록 전부 선택값으로 둠
+class RecipeUpdate(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    recipe_title: str | None = Field(default=None, min_length=1, max_length=50)
+    intro: str | None = Field(default=None, max_length=200)
+    image_url: str | None = Field(default=None, max_length=500)
+    servings: int | None = Field(default=None, ge=1, le=99)
+    tool_id: int | None = Field(default=None, gt=0)
+    level: str | None = Field(default=None, min_length=1, max_length=20)
+    cooking_time: int | None = Field(default=None, ge=1)
+    r_category_id: int | None = Field(default=None, gt=0)
+
+    ingredients: list[RecipeIngredientInput] | None = Field(default=None, min_length=1)
+    steps: list[RecipeStepInput] | None = Field(default=None, min_length=1)
+
+    

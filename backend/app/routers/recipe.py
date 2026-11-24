@@ -16,7 +16,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import get_user_id, get_optional
 from app.db.database import get_db
-from app.db.scheme.recipes import RecipeDetail, RecipeListItem, RecipeSearch
+from app.db.scheme.recipes import (RecipeDetail, RecipeListItem, RecipeSearch, 
+                                 RecipeCreate, RecipeListItem, RecipeUpdate) 
 from app.services.recipe import RecipeService
 
 # 레시피 관련 API의 공통 URL 경로와 Swagger 태그 설정
@@ -131,3 +132,47 @@ async def delete_recipe_bookmark(
     )
 
     return {"is_bookmarked": bookmarked}
+
+# -- (오효정) -- 1. POST /recipes, 2. PATCH · 3. DELETE /recipes/{recipe_id}
+# 레시피 등록 
+@router.post("", response_model=RecipeDetail)
+async def create_recipe(
+    data: RecipeCreate,
+    user_id: int = Depends(get_user_id),
+    db: AsyncSession = Depends(get_db),
+):
+    return await RecipeService.create(
+        db=db,
+        user_id=user_id,
+        data=data,
+    )
+
+
+# 본인 레시피 수정
+@router.patch("/{recipe_id}", response_model=RecipeDetail)
+async def update_recipe(
+    recipe_id: int,
+    data: RecipeUpdate,
+    user_id: int = Depends(get_user_id),
+    db: AsyncSession = Depends(get_db),
+):
+    return await RecipeService.edit(
+        db=db,
+        user_id=user_id,
+        recipe_id=recipe_id,
+        data=data,
+    )
+
+
+# 본인 레시피 삭제
+@router.delete("/{recipe_id}")
+async def delete_recipe(
+    recipe_id: int,
+    user_id: int = Depends(get_user_id),
+    db: AsyncSession = Depends(get_db),
+):
+    await RecipeService.remove(
+        db=db,
+        user_id=user_id,
+        recipe_id=recipe_id,
+    )

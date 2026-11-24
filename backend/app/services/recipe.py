@@ -16,7 +16,7 @@ from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.crud.recipe import RecipeCrud
-from app.db.scheme.recipes import RecipeDetail, RecipeListItem, RecipeSearch
+from app.db.scheme.recipes import RecipeDetail, RecipeListItem, RecipeSearch, RecipeCreate, RecipeUpdate
 from app.core.settings import settings
 
 # 레시피 검색, 상세 조회, 추천 및 좋아요/북마크 처리를 담당하는 서비스 클래스
@@ -358,3 +358,98 @@ class RecipeService:
         await db.commit()
 
         return bookmarked
+
+
+    # 레시피 등록
+    @staticmethod
+    async def create(
+        db: AsyncSession,
+        user_id: int,
+        data: RecipeCreate,
+    ) -> RecipeDetail:
+        if not user_id:
+            raise HTTPException(status_code=401, detail="로그인이 필요합니다.")
+
+        try:
+            recipe = await RecipeCrud.create(
+                db=db,
+                user_id=user_id,
+                data=data,
+            )
+            recipe_id = recipe.recipe_id
+            await db.commit()
+        except Exception:
+            await db.rollback()
+            raise
+
+        return await RecipeService.get_detail(
+            db=db,
+            recipe_id=recipe_id,
+            user_id=user_id,
+        )
+
+# -- (오효정) -- 
+    # 본인 레시피 수정
+    @staticmethod
+    async def edit(
+        db: AsyncSession,
+        user_id: int,
+        recipe_id: int,
+        data: RecipeUpdate,
+    ) -> RecipeDetail:
+        if not user_id:
+            raise HTTPException(status_code=401, detail="로그인이 필요합니다.")
+
+        recipe = await RecipeCrud.get_by_id(db, recipe_id)
+        if recipe is None:
+            raise HTTPException(status_code=404, detail="레시피를 찾을 수 없습니다.")
+
+        if recipe.user_id != user_id:
+            raise HTTPException(
+                status_code=403,
+                detail="본인 레시피만 수정할 수 있습니다.",
+            )
+
+        try:
+            await RecipeCrud.update_by_id(
+                db=db,
+                recipe_id=recipe_id,
+                data=data,
+            )
+            await db.commit()
+        except Exception:
+            await db.rollback()
+            raise
+
+        return await RecipeService.get_detail(
+            db=db,
+            recipe_id=recipe_id,
+            user_id=user_id,
+        )
+
+    # 본인 레시피 삭제
+    @staticmethod
+    async def remove(
+        db: AsyncSession,
+        user_id: int,
+        recipe_id: int,
+    ) -> None:
+        if not user_id:
+            raise HTTPException(status_code=401, detail="로그인이 필요합니다.")
+
+        recipe = await RecipeCrud.get_by_id(db, recipe_id)
+        if recipe is None:
+            raise HTTPException(status_code=404, detail="레시피를 찾을 수 없습니다.")
+
+        if recipe.user_id != user_id:
+            raise HTTPException(
+                status_code=403,
+                detail="본인 레시피만 삭제할 수 있습니다.",
+            )
+
+        try:
+            await RecipeCrud.delete_by_id(db, recipe_id)
+            await db.commit()
+        except Exception:
+            await db.rollback()
+            raise
