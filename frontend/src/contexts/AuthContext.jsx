@@ -99,6 +99,18 @@ export const AuthProvider = ({ children }) => {
 
   // 쿠키는 서버가 삭제합니다. 실패한 경우 로그인 상태를 유지합니다.
   const logout = async () => {
+    // [11/25 오효정]
+    // 로그아웃 모달 추가
+    const result = await Swal.fire({
+      title: "로그아웃하시겠습니까?",
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonText: "로그아웃",
+      cancelButtonText: "취소",
+    });
+
+    if (!result.isConfirmed) return;
+    
     try {
       await api.post("/auth/logout");
     } catch (err) {
