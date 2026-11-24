@@ -4,3 +4,4 @@ from .user import UserService
 from .fridge import FridgeService
 from .recipe import RecipeService  #권우정
 from .post import PostService      #(임유빈)
+from .home import HomeService      #(조현기) 메인화면 전용

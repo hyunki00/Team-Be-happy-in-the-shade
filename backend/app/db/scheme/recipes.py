@@ -1,4 +1,5 @@
 # 담당: 권우정 (RecipeCreate · RecipeUpdate는 오효정이 추가)
+# [병합 수정 11/24 조현기] 오효정 PR(#4) 충돌 때 지워진 RecipeSearch.fridge_first 복구 (없으면 /recipes 전부 500)
 # 할 일: BaseModel 클래스
 #   RecipeListItem   카드 하나, mockRecipes 모양 (nickname, like_count, comment_count, match_rate, missing_ingredients …)
 #   RecipeDetail     상세, mockRecipeDetail 모양 (ingredients, steps, is_liked, is_bookmarked, is_mine …)
@@ -105,6 +106,9 @@ class RecipeSearch(BaseModel):
 
     # 조리 시간이 60분을 초과하는 레시피만 검색할지 여부
     over_60: bool = False
+
+    # 내 냉장고 재료를 기준으로 레시피를 검색할지 여부  (권우정, [병합 수정 11/24 조현기] 충돌 때 지워진 것 복구)
+    fridge_first: bool = False
 
 
 # -- 오효정 추가 -- RecipeCreate / RecipeUpdate 

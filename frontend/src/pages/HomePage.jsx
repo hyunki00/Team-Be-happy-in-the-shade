@@ -5,6 +5,9 @@
 // [11/24 조현기] 내 냉장고 추천은 서버 계산이 3~4초 걸려서 따로 로딩: 그동안 회색 자리 카드 4장 + 배너 '찾는 중'
 //   (나머지 섹션은 먼저 뜨고, 추천이 오면 같은 자리에 카드만 바뀜 → 화면이 밀리지 않음)
 // [11/24 조현기] 추천 '더보기' · 주황 배너 카드 → 추천 전체 화면(/recipes/recommend, 권우정)으로 연결
+// [11/24 조현기] 내 냉장고 추천: /fridge/recommendations(3초 넘게 걸림) → 메인 전용 /home/recommendations (0.1초 안팎)
+//   서버가 { total: 전체 개수, recipes: 위 4개 }로 줌. 계산 방법 · 순서는 기존 추천과 같음
+// [11/24 조현기] 인기 · 새 레시피 · 커뮤니티 새 글도 불러오는 동안 '아직 없어요' 대신 회색 자리 표시 (처음 값 null = 불러오는 중)
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
@@ -49,11 +52,20 @@ function RecipeCardSkeleton() {
 // 레시피 카드 목록 (카드는 권우정 RecipeCard, 여기서는 칸만 나눔)
 // columns: 넓은 화면에서 한 줄에 몇 개 놓을지 (3 또는 4)
 function RecipeCardList({ recipes, showMatch = false, emptyText, columns = 4 }) {
+  const gridClass = `grid grid-cols-1 gap-5 sm:grid-cols-2 ${columns === 4 ? "lg:grid-cols-4" : "lg:grid-cols-3"}`;
+  // null = 아직 불러오는 중 → 회색 자리 카드
+  if (recipes === null) {
+    return (
+      <div role="status" aria-label="레시피를 불러오는 중" className={gridClass}>
+        {Array.from({ length: columns }, (_, i) => <RecipeCardSkeleton key={i} />)}
+      </div>
+    );
+  }
   if (recipes.length === 0) {
     return <p className="rounded-card bg-surface p-6 text-muted shadow-card">{emptyText}</p>;
   }
   return (
-    <div className={`grid grid-cols-1 gap-5 sm:grid-cols-2 ${columns === 4 ? "lg:grid-cols-4" : "lg:grid-cols-3"}`}>
+    <div className={gridClass}>
       {recipes.map((recipe) => (
         <RecipeCard key={recipe.recipe_id} recipe={recipe} showMatch={showMatch} />
       ))}
@@ -64,7 +76,7 @@ function RecipeCardList({ recipes, showMatch = false, emptyText, columns = 4 }) 
 function HomePage() {
   const { isAuthenticated } = useAuth();
 
-  // 내 냉장고 추천: 서버 GET /fridge/recommendations (일치율 50% 이상, 높은 순으로 줌)
+  // 내 냉장고 추천: 서버 GET /home/recommendations (일치율 50% 이상, 높은 순 · 위 4개 + 전체 개수)
   const [recommendRecipes, setRecommendRecipes] = useState([]);
   const [recommendTotal, setRecommendTotal] = useState(0); // 배너에 보여 줄 전체 개수
   const [recommendError, setRecommendError] = useState("");
@@ -72,9 +84,10 @@ function HomePage() {
 
   // 인기 레시피 GET /recipes?sort=popular · 새 레시피 ?sort=latest · 커뮤니티 새 글 GET /posts?sort=latest
   // ※ /recipes의 sort(인기순 · 최신순)는 권우정 백엔드에 추가가 필요함. 추가 전에는 서버가 무시해서 가나다순으로 옴
-  const [popularRecipes, setPopularRecipes] = useState([]);
-  const [newRecipes, setNewRecipes] = useState([]);
-  const [newPosts, setNewPosts] = useState([]);
+  // 처음 값 null = 불러오는 중 (실패하면 빈 목록 [])
+  const [popularRecipes, setPopularRecipes] = useState(null);
+  const [newRecipes, setNewRecipes] = useState(null);
+  const [newPosts, setNewPosts] = useState(null);
 
   // 로그인 여부와 상관없이 처음 한 번 받아 온다
   useEffect(() => {
@@ -82,13 +95,13 @@ function HomePage() {
     const { signal } = controller;
     api.get("/recipes", { params: { sort: "popular", limit: POPULAR_COUNT }, signal })
       .then(({ data }) => setPopularRecipes(data))
-      .catch(() => {});
+      .catch((err) => { if (err.code !== "ERR_CANCELED") setPopularRecipes([]); });
     api.get("/recipes", { params: { sort: "latest", limit: NEW_RECIPE_COUNT }, signal })
       .then(({ data }) => setNewRecipes(data))
-      .catch(() => {});
+      .catch((err) => { if (err.code !== "ERR_CANCELED") setNewRecipes([]); });
     api.get("/posts", { params: { sort: "latest", limit: NEW_POST_COUNT }, signal })
       .then(({ data }) => setNewPosts(data))
-      .catch(() => {});
+      .catch((err) => { if (err.code !== "ERR_CANCELED") setNewPosts([]); });
     return () => controller.abort();
   }, []);
 
@@ -97,10 +110,10 @@ function HomePage() {
     if (!isAuthenticated) return;
     const controller = new AbortController();
     api
-      .get("/fridge/recommendations", { signal: controller.signal })
+      .get("/home/recommendations", { params: { limit: RECOMMEND_COUNT }, signal: controller.signal })
       .then(({ data }) => {
-        setRecommendRecipes(data.slice(0, RECOMMEND_COUNT));
-        setRecommendTotal(data.length);
+        setRecommendRecipes(data.recipes);
+        setRecommendTotal(data.total);
         setRecommendError("");
       })
       .catch((err) => {
@@ -204,7 +217,7 @@ function HomePage() {
             <>
               <SectionTitle title="인기 레시피" moreTo="/recipes" />
               <RecipeCardList
-                recipes={popularRecipes.slice(0, NEW_RECIPE_COUNT)}
+                recipes={popularRecipes && popularRecipes.slice(0, NEW_RECIPE_COUNT)}
                 emptyText="아직 레시피가 없어요."
                 columns={3}
               />
@@ -220,7 +233,15 @@ function HomePage() {
         {/* ⑥ 커뮤니티 새 글: 최신 순, 흰 카드 안 목록 */}
         <section className="lg:w-80">
           <SectionTitle title="커뮤니티 새 글" moreTo="/board" />
-          {newPosts.length === 0 ? (
+          {newPosts === null ? (
+            <ul role="status" aria-label="새 글을 불러오는 중" className="rounded-card bg-surface py-2 shadow-card divide-y divide-line">
+              {Array.from({ length: NEW_POST_COUNT }, (_, i) => (
+                <li key={i} className="px-6 py-4 animate-pulse" aria-hidden="true">
+                  <div className="h-5 w-4/5 rounded-pill bg-gray-100" />
+                </li>
+              ))}
+            </ul>
+          ) : newPosts.length === 0 ? (
             <p className="rounded-card bg-surface p-6 text-muted shadow-card">아직 새 글이 없어요.</p>
           ) : (
             <ul className="rounded-card bg-surface py-2 shadow-card divide-y divide-line">

@@ -5,3 +5,4 @@ from .user import UserCrud         #(오효정)
 from .fridge import FridgeCrud     #(정호진)
 from .recipe import RecipeCrud     #권우정
 from .post import PostCrud         #(임유빈)
+from .home import HomeCrud         #(조현기) 메인화면 전용

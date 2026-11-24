@@ -1,4 +1,5 @@
 # 담당: 임유빈
+# [병합 수정 11/24 조현기] get_list의 '목록 카드 만들기' 부분을 build_list_items로 꺼냄 (마이페이지도 같이 씀). 게시판 목록 동작은 그대로
 # 할 일: class PostService
 #   get_list / get_detail / write / edit / remove / toggle_like
 #   ※ 본인 글 · 댓글만 수정 · 삭제 (아니면 403), 사진 최대 5장
@@ -51,6 +52,13 @@ class PostService:
 
             posts = await PostCrud.get_list(db, sort=sort, search_type=search_type, keyword=keyword, skip=skip, limit=limit)
 
+            # [병합 수정 11/24 조현기] 아래 '목록 카드 만들기'를 build_list_items로 꺼냄 (마이페이지도 같이 씀, 동작은 그대로)
+            return await PostService.build_list_items(db, posts)
+
+      # 게시글 목록 카드 만들기 (작성자 닉네임 · 좋아요 수 · 댓글 수 · 사진)
+      #   get_list(게시판 목록)와 마이페이지(내 게시글 · 좋아요한 게시글)가 같이 씀
+      @staticmethod
+      async def build_list_items(db: AsyncSession, posts) -> list[PostListItem]:
             #조회된 게시글 없으면 빈 리스트 반환
             if not posts:  
                   return []

@@ -1,3 +1,8 @@
+# [병합 수정 11/24 조현기] 오효정 PR(#4) 충돌 정리 중 깨진 곳 복구 (효정씨 동의)
+#   - get_tool_name 들여쓰기 복구 (틀어져서 모든 레시피 조회가 500 오류)
+#   - get_user_tool_ids 복구 (권우정: '내 도구로 가능' 계산에 씀, 충돌 때 지워짐)
+#   - 마이페이지용 get_by_user · get_liked_by_user · get_bookmarked_by_user 추가 (routers/user.py가 부름)
+#   - update_by_id: 단계에 step_image_url을 안 보내면 500 나던 것 → .get()으로
 # 담당: 권우정 (create · update_by_id · delete_by_id는 오효정이 추가)
 # 할 일: class RecipeCrud
 #   get_list(db, search) / get_by_id(db, recipe_id) / get_ingredient_ids(db, recipe_id)
@@ -359,7 +364,7 @@ class RecipeCrud:
             return None
 
         # 조리 도구 이름을 조회하기 위한 테이블 정의
-            tools_t = table(
+        tools_t = table(
             "standard_tools",
             column("tool_id"),
             column("tool_name")
@@ -372,6 +377,60 @@ class RecipeCrud:
         result = await db.execute(stmt)
         return result.scalar_one_or_none()
 
+
+    # 사용자가 보유한 조리도구 ID 목록 조회  (권우정, [병합 수정 11/24] 복구)
+    @staticmethod
+    async def get_user_tool_ids(
+        db: AsyncSession,
+        user_id: int
+    ) -> list[int]:
+
+        # 사용자 조리도구 테이블
+        my_tools_t = table(
+            "my_tools",
+            column("user_id"),
+            column("tool_id")
+        )
+
+        # 해당 사용자가 보유한 도구 ID 조회
+        stmt = select(my_tools_t.c.tool_id).where(
+            my_tools_t.c.user_id == user_id
+        )
+
+        result = await db.execute(stmt)
+
+        # 조회한 도구 ID들을 리스트로 반환
+        return list(result.scalars().all())
+
+    # ── 마이페이지 ([병합 수정 11/24] routers/user.py에서 부르는데 없어서 추가) ──
+    # 내가 쓴 레시피 (최신순)
+    @staticmethod
+    async def get_by_user(db: AsyncSession, user_id: int) -> list[Recipe]:
+        result = await db.execute(
+            select(Recipe).where(Recipe.user_id == user_id)
+            .order_by(Recipe.created_at.desc(), Recipe.recipe_id.desc())
+        )
+        return list(result.scalars().all())
+
+    # 내가 좋아요한 레시피 (최근에 누른 순)
+    @staticmethod
+    async def get_liked_by_user(db: AsyncSession, user_id: int) -> list[Recipe]:
+        result = await db.execute(
+            select(Recipe).join(RecipeLike, RecipeLike.recipe_id == Recipe.recipe_id)
+            .where(RecipeLike.user_id == user_id)
+            .order_by(RecipeLike.created_at.desc())
+        )
+        return list(result.scalars().all())
+
+    # 내가 북마크한 레시피 (최근에 누른 순)
+    @staticmethod
+    async def get_bookmarked_by_user(db: AsyncSession, user_id: int) -> list[Recipe]:
+        result = await db.execute(
+            select(Recipe).join(Bookmark, Bookmark.recipe_id == Recipe.recipe_id)
+            .where(Bookmark.user_id == user_id)
+            .order_by(Bookmark.created_at.desc())
+        )
+        return list(result.scalars().all())
 
 # -- (오효정) --
 # 레시피와 재료·조리 단계를 생성
@@ -459,7 +518,7 @@ class RecipeCrud:
                     recipe_id=recipe_id,
                     step_no=step["step_no"],
                     step_content=step["step_content"],
-                    step_image_url=step["step_image_url"],
+                    step_image_url=step.get("step_image_url"),
                 )
                 for step in steps
             ])

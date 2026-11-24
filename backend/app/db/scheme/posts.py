@@ -1,4 +1,5 @@
 # 담당: 임유빈
+# [병합 수정 11/24 조현기] 마이페이지 '내 게시글 댓글' 모양 MyPostCommentRead를 맨 아래에 추가
 # 할 일: BaseModel 클래스
 #   PostCreate / PostUpdate   title, content, 사진
 #   PostListItem / PostDetail mockPosts 모양 (nickname, like_count, comment_count, images, is_liked, is_mine)
@@ -120,3 +121,13 @@ class PostCommentRead(BaseModel):
     created_at: datetime
     nickname: Optional[str] = None
     is_mine: bool = False
+
+
+# [병합 수정 11/24 조현기] 마이페이지 '내 게시글 댓글' (routers/user.py에서 씀 · 오효정 마이페이지 API용)
+class MyPostCommentRead(BaseModel):
+    pc_id: int
+    post_id: int
+    post_title: str
+    pc_content: str
+    pc_image_url: Optional[str] = None
+    created_at: datetime

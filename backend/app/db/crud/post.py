@@ -1,4 +1,5 @@
 # 담당: 임유빈
+# [병합 수정 11/24 조현기] 오효정 마이페이지 API용 조회 3개를 맨 아래에 추가 (get_by_user · get_liked_by_user · get_comments_by_user). 기존 코드는 그대로
 # 할 일: class PostCrud
 #   get_list(db, sort, search_type, keyword)  최신순 · 인기순 / 제목 · 제목+내용 · 작성자 검색
 #   get_by_id / create / update_by_id / delete_by_id
@@ -228,3 +229,37 @@ class PostCrud:
         await db.delete(db_comment)
         await db.flush()
         return True
+
+
+    # ── 마이페이지 ([병합 수정 11/24 조현기] 오효정 마이페이지 API(routers/user.py)가 부르는 조회) ──
+    # 내가 쓴 게시글 (최신순)
+    @staticmethod
+    async def get_by_user(db: AsyncSession, user_id: int) -> list[Post]:
+        result = await db.execute(
+            select(Post).options(selectinload(Post.images))
+            .where(Post.user_id == user_id)
+            .order_by(Post.created_at.desc(), Post.post_id.desc())
+        )
+        return list(result.scalars().all())
+
+    # 내가 좋아요한 게시글 (최근에 누른 순)
+    @staticmethod
+    async def get_liked_by_user(db: AsyncSession, user_id: int) -> list[Post]:
+        result = await db.execute(
+            select(Post).options(selectinload(Post.images))
+            .join(PostLike, PostLike.post_id == Post.post_id)
+            .where(PostLike.user_id == user_id)
+            .order_by(PostLike.created_at.desc())
+        )
+        return list(result.scalars().all())
+
+    # 내가 쓴 게시글 댓글 + 그 게시글 제목 (최신순)
+    @staticmethod
+    async def get_comments_by_user(db: AsyncSession, user_id: int) -> list[tuple[PostComment, str]]:
+        result = await db.execute(
+            select(PostComment, Post.title)
+            .join(Post, Post.post_id == PostComment.post_id)
+            .where(PostComment.user_id == user_id)
+            .order_by(PostComment.created_at.desc(), PostComment.pc_id.desc())
+        )
+        return [(row[0], row[1]) for row in result.all()]

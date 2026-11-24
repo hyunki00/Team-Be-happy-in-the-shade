@@ -37,7 +37,7 @@ app.add_middleware(
 
 # 라우터 등록: app/routers/파일이름.py 안에 router = APIRouter(...)가 있으면 자동으로 등록된다.
 # 그래서 각자 라우터를 만들 때 이 파일(main.py)은 고치지 않아도 된다. (같은 파일 동시 수정 → 충돌 방지)
-ROUTERS = ["auth", "user", "ingredient", "fridge", "recipe", "recipe_comment", "post", "email_auth"]
+ROUTERS = ["auth", "user", "ingredient", "fridge", "recipe", "recipe_comment", "post", "email_auth", "home"]  # [11/24 조현기] home: 메인화면 전용 빠른 추천
 for name in ROUTERS:
     module = importlib.import_module(f"app.routers.{name}")
     if hasattr(module, "router"):

@@ -3,6 +3,8 @@
 //   1. signup-layout · panel · auth-heading · form-field · btn 등은 정의된 CSS가 없어서 적용이 안 되고 있었음 → Tailwind 클래스로 바꿈
 //   2. 가운데 흰 카드(최대 520px), 입력칸 옆 확인 버튼은 회색 알약, 가입 버튼은 포인트색
 //   3. 안내 · 오류 문구: 성공은 초록, 오류는 빨간 상자
+// [병합 수정 11/24 조현기] MOCK_EMAIL_CODE가 지워진 채 쓰여서 [인증 확인]이 오류 → 가입이 막히던 문제
+//   이메일 인증을 실제 API로 연결 (비밀번호 찾기와 같은 email_auth: POST /auth/send-code · /auth/verify-code)
 
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -75,8 +77,14 @@ export default function SignUpPage() {
     }
   };
 
-  // 이메일 인증번호 요청 mock
-  const sendEmailCode = () => {
+  // 서버가 준 오류 문장 꺼내기
+  const errorText = (err, fallback) => {
+    const detail = err.response?.data?.detail;
+    return typeof detail === 'string' ? detail : fallback;
+  };
+
+  // 이메일 인증번호 요청 (POST /auth/send-code) — 메일 계정이 없으면 백엔드 터미널에 번호가 찍힘
+  const sendEmailCode = async () => {
     const email = form.email.trim();
 
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -84,28 +92,32 @@ export default function SignUpPage() {
       return;
     }
 
-    // 백엔드 연결 시: 실제 이메일 발송 API 호출
-    setSentEmail(email);
-    setVerifiedEmail('');
-    setVerificationCode('');
-    setEmailMessage('테스트 인증번호는 123456입니다. 실제 메일은 발송되지 않습니다.');
+    try {
+      const { data } = await api.post('/auth/send-code', { email });
+      setSentEmail(email);
+      setVerifiedEmail('');
+      setVerificationCode('');
+      setEmailMessage(data.message ?? '인증번호를 보냈습니다.');
+    } catch (err) {
+      setSentEmail('');
+      setEmailMessage(errorText(err, '인증번호를 보내지 못했습니다. 다시 시도해 주세요.'));
+    }
   };
 
-  // 이메일 인증번호 확인 mock
-  const verifyEmailCode = () => {
+  // 이메일 인증번호 확인 (POST /auth/verify-code)
+  const verifyEmailCode = async () => {
     if (!sentEmail || sentEmail !== form.email.trim()) {
       setEmailMessage('먼저 인증번호를 요청하세요.');
       return;
     }
 
-    // 백엔드 연결 시: 인증번호 확인 API 호출
-    if (verificationCode !== MOCK_EMAIL_CODE) {
-      setEmailMessage('인증번호가 일치하지 않습니다.');
-      return;
+    try {
+      await api.post('/auth/verify-code', { email: sentEmail, code: verificationCode });
+      setVerifiedEmail(sentEmail);
+      setEmailMessage('이메일 인증이 완료되었습니다.');
+    } catch (err) {
+      setEmailMessage(errorText(err, '인증번호 확인에 실패했습니다. 다시 시도해 주세요.'));
     }
-
-    setVerifiedEmail(sentEmail);
-    setEmailMessage('이메일 인증이 완료되었습니다.');
   };
 
   const submit = async (event) => {
