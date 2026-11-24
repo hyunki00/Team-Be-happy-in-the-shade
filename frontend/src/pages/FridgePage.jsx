@@ -6,12 +6,12 @@
 //   4. 오류 문구: 연한 빨간 상자
 // [레이아웃 11/22 조현기] 스크롤이 길어서 와이어프레임 p.10처럼 정리 — API · 상태 로직은 그대로
 //   1. 제목 줄 오른쪽에 '+ 재료 추가', 탭 · 내 재료 찾기 · '소비기한 임박순'을 한 줄로
-//   2. 식재료 탭: 왼쪽 재료 카드(작게, 한 줄 최대 6개) + 오른쪽 '지금 만들 수 있는 요리' 칸(340px, 스크롤해도 따라옴)
+//   2. 식재료 탭: 왼쪽 재료 카드(작게, 한 줄 5개, 한 페이지 최대 15개) + 오른쪽 '지금 만들 수 있는 요리' 칸(340px, 스크롤해도 따라옴)
 //      - 추천은 RecipeCard 대신 작은 줄 목록(사진 · 이름 · 일치율 · 부족 재료), 누르면 레시피 상세 → RecipeCard import 대신 Link
 //      - 추천 확인 버튼 동작은 그대로 (getRecommendations)
-//   3. 재료 수정 · 등록 칸은 카드 아래로 (와이어프레임 ④ '아래에서 수정')
+//   3. 재료 수정 · 등록 칸은 재료 목록 위에 표시
 //   4. 오른쪽 칸 안 스크롤에서 글자와 상자가 어긋나 보이는 문제 → 칸 안 스크롤 · 따라오기(sticky) 없앰
-//      대신 처음 6개만 보이고 'N개 모두 보기'로 펼침 (showAllRecipes 상태 추가, 추천 로직은 그대로)
+//      추천 요리는 페이지당 최대 5개씩 표시
 // [수정 11/24 조현기] 재료 추가: 검색어를 입력하면 입력칸 바로 아래에 결과 목록이 자동으로 펼쳐짐
 //   원래는 검색 후 따로 있는 '식재료를 선택하세요' 드롭다운(<select>)을 한 번 더 눌러 열어야 했음
 //   목록 모양은 레시피 쓰기(RecipeForm)의 재료 검색 목록과 같게 (흰 바탕 · 둥근 모서리 · 그림자 · 위아래 스크롤)
@@ -31,8 +31,18 @@ function errorMessage(err) {
   return "서버에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요.";
 }
 
-// 오른쪽 칸에 처음 보여 줄 추천 개수 (나머지는 '모두 보기')
-const RECOMMEND_PREVIEW = 6;
+const INGREDIENT_PAGE_SIZE = 15;
+const RECIPE_PAGE_SIZE = 5;
+
+function Pagination({ label, page, totalPages, onChange, disabled = false }) {
+  return (
+    <nav aria-label={label} className="flex items-center justify-center gap-3">
+      <button type="button" disabled={disabled || page === 1} onClick={() => onChange(page - 1)} className="h-10 rounded-pill bg-surface px-4 text-sm font-bold shadow-card disabled:opacity-40">이전</button>
+      <span role="status" className="text-sm font-bold">{page} / {totalPages} 페이지</span>
+      <button type="button" disabled={disabled || page === totalPages} onClick={() => onChange(page + 1)} className="h-10 rounded-pill bg-surface px-4 text-sm font-bold shadow-card disabled:opacity-40">다음</button>
+    </nav>
+  );
+}
 
 function FridgePage() {
   const [ingredients, setIngredients] = useState([]);
@@ -57,7 +67,8 @@ function FridgePage() {
   const [recipes, setRecipes] = useState([]);
   const [recommendMessage, setRecommendMessage] = useState("");
   const [isRecommending, setIsRecommending] = useState(false);
-  const [showAllRecipes, setShowAllRecipes] = useState(false); // 추천 목록 펼치기 (화면 표시용)
+  const [ingredientPage, setIngredientPage] = useState(1);
+  const [recipePage, setRecipePage] = useState(1);
   const meatCategory = categories.find((item) => item.category_name === "육류")?.ing_category_id;
 
   useEffect(() => {
@@ -144,6 +155,7 @@ function FridgePage() {
     try {
       const { data } = await api.get("/fridge/recommendations");
       setRecipes(data);
+      setRecipePage(1);
       if (!data.length) setRecommendMessage("현재 재료로 추천할 요리가 없습니다.");
     } catch (err) { setRecipes([]); setRecommendMessage(errorMessage(err)); }
     finally { setIsRecommending(false); }
@@ -151,6 +163,12 @@ function FridgePage() {
 
   const filtered = ingredients.filter((item) => item.ing_name.includes(keyword.trim())).sort((a, b) =>
     (a.expiration_date || "9999-12-31").localeCompare(b.expiration_date || "9999-12-31") || a.user_ing_id - b.user_ing_id);
+  const ingredientPages = Math.max(1, Math.ceil(filtered.length / INGREDIENT_PAGE_SIZE));
+  const currentIngredientPage = Math.min(ingredientPage, ingredientPages);
+  const visibleIngredients = filtered.slice((currentIngredientPage - 1) * INGREDIENT_PAGE_SIZE, currentIngredientPage * INGREDIENT_PAGE_SIZE);
+  const recipePages = Math.max(1, Math.ceil(recipes.length / RECIPE_PAGE_SIZE));
+  const currentRecipePage = Math.min(recipePage, recipePages);
+  const visibleRecipes = recipes.slice((currentRecipePage - 1) * RECIPE_PAGE_SIZE, currentRecipePage * RECIPE_PAGE_SIZE);
   const availableTools = standardTools.filter((tool) => !tools.some((mine) => mine.tool_id === tool.tool_id));
 
   const tabClass = (isOn) =>
@@ -183,7 +201,7 @@ function FridgePage() {
             <button aria-pressed={tab === "tools"} onClick={() => { setTab("tools"); setError(""); }} className={tabClass(tab === "tools")}>조리도구 {tools.length}</button>
           </div>
           {tab === "ingredients" && <>
-            <input aria-label="내 재료 찾기" value={keyword} onChange={(e) => setKeyword(e.target.value)} placeholder="내 재료 찾기" className="h-11 min-w-0 flex-1 sm:ml-2 sm:flex-none sm:w-60 rounded-pill px-5" />
+            <input aria-label="내 재료 찾기" value={keyword} onChange={(e) => { setKeyword(e.target.value); setIngredientPage(1); }} placeholder="내 재료 찾기" className="h-11 min-w-0 flex-1 sm:ml-2 sm:flex-none sm:w-60 rounded-pill px-5" />
             <span className="ml-auto text-sm text-muted">소비기한 임박순</span>
           </>}
         </div>
@@ -225,19 +243,22 @@ function FridgePage() {
                 {catalogError && <p role="alert" className="mt-2 text-sm text-miss">{catalogError}</p>}
                 <button disabled={isSaving} onClick={() => { setIsAdding(false); setSelected(null); }} className="mt-3 text-sm text-muted underline hover:text-accent">추가 닫기</button>
               </section>}
-              <fieldset disabled={isSaving} className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 xl:grid-cols-6 gap-3">
-                {filtered.map((item) => <IngredientCard key={item.user_ing_id} item={item} onClick={() => { setSelected(item); setIsAdding(false); setError(""); }} onDeleteClick={() => deleteIngredient(item)} />)}
-              </fieldset>
-              {filtered.length === 0 && <p className={`${cardClass} text-muted`}>{keyword ? "검색한 재료가 없습니다." : "아직 등록한 재료가 없습니다. 재료를 추가해 주세요."}</p>}
-              <p className="text-sm text-muted">기한이 지난 재료는 확인 후 삭제할 수 있습니다. 카드를 누르면 아래에서 수정해요.</p>
-              {/* 수정 · 등록 칸: 카드 아래 (와이어프레임 p.10 ④) */}
+              {/* 수정 · 등록 칸: 재료 목록 위에서 바로 확인 */}
               {selected && <section>
                 <IngredientForm key={`${isAdding}-${selected.user_ing_id || selected.ing_id}`} mode={isAdding ? "create" : "edit"} initialValue={selected} isMeat={selected.ing_category_id === meatCategory} isSaving={isSaving} onSubmit={saveIngredient} onClose={() => { setSelected(null); setIsAdding(false); }} />
                 {!isAdding && <button disabled={isSaving} onClick={() => deleteIngredient(selected)} className="mt-3 inline-flex items-center h-11 px-5 rounded-pill bg-miss-soft text-miss text-[15px] font-bold disabled:opacity-40">재료 삭제</button>}
               </section>}
+              <div className="overflow-x-auto pb-1">
+                <fieldset aria-label="보유 중인 재료" disabled={isSaving} className="grid min-w-[540px] grid-cols-5 gap-3">
+                  {visibleIngredients.map((item) => <IngredientCard key={item.user_ing_id} item={item} onClick={() => { setSelected(item); setIsAdding(false); setError(""); }} onDeleteClick={() => deleteIngredient(item)} />)}
+                </fieldset>
+              </div>
+              {filtered.length > 0 && <Pagination label="보유 재료 페이지" page={currentIngredientPage} totalPages={ingredientPages} onChange={setIngredientPage} disabled={isSaving} />}
+              {filtered.length === 0 && <p className={`${cardClass} text-muted`}>{keyword ? "검색한 재료가 없습니다." : "아직 등록한 재료가 없습니다. 재료를 추가해 주세요."}</p>}
+              <p className="text-sm text-muted">기한이 지난 재료는 확인 후 삭제할 수 있습니다. 카드를 누르면 위에서 수정해요.</p>
             </div>
 
-            {/* 오른쪽 칸: 스크롤해도 따라오고, 목록이 길면 칸 안에서만 스크롤 */}
+            {/* 오른쪽 칸: 추천 요리를 5개씩 페이지로 표시 */}
             <aside aria-labelledby="fridge-recommend-title" className="flex flex-col gap-3 rounded-card bg-have-soft p-5">
               <div className="flex items-center justify-between gap-3">
                 <h2 id="fridge-recommend-title" className="text-lg font-black text-have">
@@ -250,7 +271,7 @@ function FridgePage() {
               {recommendMessage && <p role="status" className="text-sm text-ink-soft">{recommendMessage}</p>}
               {recipes.length > 0 && (
                 <ul className="flex flex-col gap-2">
-                  {(showAllRecipes ? recipes : recipes.slice(0, RECOMMEND_PREVIEW)).map((recipe) => (
+                  {visibleRecipes.map((recipe) => (
                     <li key={recipe.recipe_id}>
                       <Link to={`/recipes/${recipe.recipe_id}`} className="flex items-center gap-3 rounded-[18px] bg-surface p-2.5 hover:ring-2 hover:ring-have">
                         {recipe.image_url
@@ -269,11 +290,7 @@ function FridgePage() {
                   ))}
                 </ul>
               )}
-              {recipes.length > RECOMMEND_PREVIEW && (
-                <button type="button" onClick={() => setShowAllRecipes((prev) => !prev)} className="h-10 rounded-pill bg-surface text-sm font-bold text-have hover:ring-2 hover:ring-have">
-                  {showAllRecipes ? "접기" : `${recipes.length}개 모두 보기`}
-                </button>
-              )}
+              {recipes.length > 0 && <Pagination label="추천 요리 페이지" page={currentRecipePage} totalPages={recipePages} onChange={setRecipePage} disabled={isRecommending} />}
               {!recipes.length && !recommendMessage && <p className="text-sm text-ink-soft">‘추천 확인’을 누르면 지금 재료로 만들 수 있는 요리를 보여 드려요.</p>}
             </aside>
           </div>
