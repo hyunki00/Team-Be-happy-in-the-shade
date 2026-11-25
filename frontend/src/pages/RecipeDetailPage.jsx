@@ -6,6 +6,7 @@
 //     + 127.0.0.1로 보내면 localhost에서 받은 로그인 쿠키가 같이 안 가서 좋아요 · 북마크가 401(로그인 필요)로 실패하던 문제
 //   - 재료 칩: 상세 API는 내 냉장고 기준 부족 재료를 주지 않아서 '보유 / 부족' 표시는 뺌 (이름 + 분량만)
 // [디자인 11/22 조현기] 시안 F: 가운데 한 줄(최대 760px), 4칸 정보, 둥근 좋아요 · 북마크 버튼, 번호 동그라미 조리 순서
+// [11/25 오효정] 수정, 삭제 버튼 disable로 되어있는거 주석처리 - 마이페이지에서만 처리가능하게
 import { useParams } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { useAuth } from "../contexts/AuthContext";
@@ -13,7 +14,6 @@ import CommentSection from "../components/CommentSection";
 import api from "../api"; // [병합] 공통 api
 
 function RecipeDetailPage() {
-
   // URL에서 레시피 ID를 가져와 숫자로 변환
   const { id } = useParams();
   const recipeId = Number(id);
@@ -182,12 +182,12 @@ function RecipeDetailPage() {
             {recipe.category_name}
           </span>
           {/* 로그인한 사용자 본인의 레시피인 경우 수정/삭제 버튼 표시 */}
-          {isAuthenticated && recipe.is_mine && (
+          {/* {isAuthenticated && recipe.is_mine && (
             <div className="flex gap-1 text-sm text-ink-soft">
               <button type="button" className="px-3 py-2 disabled:opacity-40" disabled>수정</button>
               <button type="button" className="px-3 py-2 disabled:opacity-40" disabled>삭제</button>
             </div>
-          )}
+          )} */}
         </div>
         <h2 className="mt-3 text-3xl font-black tracking-tight md:text-4xl">{recipe.recipe_title}</h2>
         {recipe.intro && <p className="mt-3 text-ink-soft leading-relaxed">{recipe.intro}</p>}

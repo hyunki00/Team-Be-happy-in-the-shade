@@ -4,7 +4,7 @@
 //   2. 좋아요 취소는 작은 회색 알약 버튼, 빈 목록 안내는 흐린 글씨
 
 //board 컴포넌트 재사용해 출력하게한다
-
+import { Link } from 'react-router-dom';
 
 //내포스트
 function MyPostList({
@@ -22,14 +22,39 @@ function MyPostList({
       ) : (
         <ul className="mt-4 divide-y divide-line">
           {posts.map((post) => (
+              // 이동 및 수정버튼, 날짜 표시
             <li key={post.post_id} className="flex items-center justify-between gap-3 py-4">
-              {post.title}
-              {onCancelLike && (
-                <button type="button" className="h-9 flex-none rounded-pill bg-gray-100 px-4 text-sm font-medium hover:bg-gray-200" onClick={() => onCancelLike(post.post_id)}>
-                  좋아요 취소
-                </button>
+              <div className="min-w-0 flex-1">
+                <Link
+                  to={`/board/${post.post_id}`}
+                  className="block truncate hover:text-accent"
+                >
+                  {post.title}
+                </Link>
+                <span className="text-sm text-muted">
+                  {post.created_at?.slice(0, 10)}
+                </span>
+              </div>
+
+              {title === '내 게시글' && (
+                <Link
+                  to={`/board/${post.post_id}/edit`}
+                  className="h-9 flex-none rounded-pill bg-gray-100 px-4 py-2 text-sm font-medium hover:bg-gray-200"
+                >
+                  수정
+                </Link>
               )}
-            </li>
+
+            {onCancelLike && (
+              <button
+                type="button"
+                className="h-9 flex-none rounded-pill bg-gray-100 px-4 text-sm font-medium hover:bg-gray-200"
+                onClick={() => onCancelLike(post.post_id)}
+              >
+                좋아요 취소
+              </button>
+            )}
+          </li>
           ))}
         </ul>
       )}
