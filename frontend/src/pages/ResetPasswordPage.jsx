@@ -165,7 +165,7 @@ export default function ResetPasswordPage() {
   const sideButton = "h-12 flex-none rounded-pill bg-gray-100 px-4 text-sm font-bold hover:bg-gray-200";
 
   return (
-    <div className="mx-auto mt-4 flex max-w-[440px] flex-col gap-5 rounded-card bg-surface p-8 shadow-card md:p-10">
+    <div className="mx-auto mt-4 flex max-w-[520px] flex-col gap-5 rounded-card bg-surface p-8 shadow-card md:p-10">
       <h2 className="text-3xl font-black">비밀번호 찾기</h2>
 
       {step === 'verify' ? (
