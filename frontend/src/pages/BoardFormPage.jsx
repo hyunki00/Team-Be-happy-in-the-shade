@@ -7,18 +7,21 @@
 //   4) 린트 오류 5개: 안 쓰는 React import · err, 이펙트 안 setState
 //   5) [2차] 사진 저장: 사진을 고르는 즉시 서버(POST /images)에 올리고, 돌려받은 진짜 주소를 images에 넣음
 //      → 다시 열어도 사진이 깨지지 않음 (원래는 blob: 임시 주소라 창을 닫으면 깨졌음)
-// 커뮤니티 게시물 작성 페이지 [아직 수정중]
+// 커뮤니티 게시물 작성 페이지
 // [디자인 11/22 조현기] 시안 F 적용 — className(모양)만 바꿈, 작성 · 사진 · 레시피 연결 로직은 그대로
 //   1. 작성 폼 · 레시피 검색 창: 흰 둥근 카드(rounded-card · shadow-card)
 //   2. 등록 버튼: 검정 → 포인트색(accent), 버튼 · 한 줄 입력칸은 알약 모양(rounded-pill)
 //   3. 필수(*) · 연결 해제 글씨: 빨강 → 시안 색(miss), 입력칸 포커스 테두리는 포인트색
 //   4. 회색(gray) 클래스는 그대로 둠 — index.css에서 따뜻한 회색으로 바뀌어 있음
-// 후기작성 경로 [아직 수정/작성중..]
+
 import { useState, useEffect } from 'react'; // [수정 11/24 조현기] 린트: 안 쓰는 React import 삭제 (React 17 이후 JSX에 필요 없음)
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import api, { uploadImage } from '../api';   // [수정 11/24 조현기 2차] uploadImage: 사진 올리기 (api.js)
 import { BOARD_TITLE_MAX, BOARD_CONTENT_MAX, BOARD_IMAGE_MAX_COUNT, IMAGE_MAX_MB } from '../constants';
 import { useAuth } from '../contexts/AuthContext';
+import Swal from 'sweetalert2';
+
+const SWAL_ACCENT_COLOR = '#C85A32';
 
 export default function BoardFormPage() {
   const navigate = useNavigate();
@@ -64,9 +67,13 @@ useEffect(() => {
         setImages(loadedImages);
         setLinkedRecipe(data.linked_recipe || null);
       })
-      .catch((err) => {
+      .catch(async (err) => {
         if (err.code === 'ERR_CANCELED') return;
-        alert('존재하지 않거나 이미 삭제된 게시글입니다.');
+        await Swal.fire({
+          icon: 'error',
+          text: '존재하지 않거나 이미 삭제된 게시글입니다.',
+          confirmButtonColor: SWAL_ACCENT_COLOR,
+        });
         navigate('/board', { replace: true });
       });
 
@@ -85,11 +92,15 @@ const isValid = title.trim() !== '' && content.trim() !== '' && !isSubmitting &&
   //   - async: 서버 응답을 기다려야 해서. 올리는 동안 '사진 올리는 중...' + 등록 버튼 잠금
   //   - 여러 장을 고르면 차례대로 올림. 중간에 실패하면 거기까지 올린 사진은 남기고 알림
   //   - e.target.value = '': 같은 사진을 지웠다가 다시 골라도 onChange가 다시 불리게 입력칸을 비움
-  const handleImageChange = async (e) => {
+const handleImageChange = async (e) => {
     const files = Array.from(e.target.files);
     e.target.value = '';
     if (images.length + files.length > BOARD_IMAGE_MAX_COUNT) {
-      alert(`사진은 최대 ${BOARD_IMAGE_MAX_COUNT}장까지 업로드할 수 있습니다.`);
+      await Swal.fire({
+        icon: 'warning',
+        text: `사진은 최대 ${BOARD_IMAGE_MAX_COUNT}장까지 업로드할 수 있습니다.`,
+        confirmButtonColor: SWAL_ACCENT_COLOR,
+      });
       return;
     }
 
@@ -101,21 +112,28 @@ const isValid = title.trim() !== '' && content.trim() !== '' && !isSubmitting &&
       }
     } catch (err) {
       const detail = err.response?.data?.detail;
-      alert(typeof detail === 'string' ? detail : '사진을 올리지 못했습니다. 잠시 후 다시 시도해 주세요.');
+      await Swal.fire({
+        icon: 'error',
+        text: typeof detail === 'string' ? detail : '사진을 올리지 못했습니다. 잠시 후 다시 시도해 주세요.',
+        confirmButtonColor: SWAL_ACCENT_COLOR,
+      });
     } finally {
       setIsUploading(false);
     }
   };
   
-  // 이미지 삭제
-  const handleRemoveImage = (indexToRemove) => {
-    setImages((prev) => prev.filter((_, index) => index !== indexToRemove));
-  };
-
   // 취소 / 뒤로가기 버튼 처리
-  const handleCancel = () => {
-    if ((title.trim() || content.trim() || images.length > 0) && !window.confirm('작성 중인 내용이 저장되지 않습니다. 나가시겠습니까?')) {
-      return;
+  const handleCancel = async () => {
+    if (title.trim() || content.trim() || images.length > 0) {
+      const result = await Swal.fire({
+        icon: 'warning',
+        text: '작성 중인 내용이 저장되지 않습니다. 나가시겠습니까?',
+        showCancelButton: true,
+        confirmButtonText: '나가기',
+        cancelButtonText: '계속 작성',
+        confirmButtonColor: SWAL_ACCENT_COLOR,
+      });
+      if (!result.isConfirmed) return;
     }
     navigate(-1);
   };
@@ -126,7 +144,11 @@ const isValid = title.trim() !== '' && content.trim() !== '' && !isSubmitting &&
     if (!isValid) return;
 
     if (!isAuthenticated) {
-      alert('로그인이 필요한 서비스입니다.');
+      await Swal.fire({
+        icon: 'info',
+        text: '로그인이 필요한 서비스입니다.',
+        confirmButtonColor: SWAL_ACCENT_COLOR,
+      });
       navigate('/login', { state: { from: location.pathname } });   // [수정 11/24 조현기] 로그인하면 이 글쓰기 화면으로 돌아옴
       return;
     }
@@ -151,12 +173,20 @@ const isValid = title.trim() !== '' && content.trim() !== '' && !isSubmitting &&
         ? await api.patch(`/posts/${id}`, payload)
         : await api.post('/posts', payload);
 
-      alert(isEditMode ? '수정이 완료되었습니다.' : '게시글이 등록되었습니다.');
+      await Swal.fire({
+        icon: 'success',
+        text: isEditMode ? '수정이 완료되었습니다.' : '게시글이 등록되었습니다.',
+        confirmButtonColor: SWAL_ACCENT_COLOR,
+      });
       navigate(`/board/${data.post_id}`);
 
     } catch {   // [수정 11/24 조현기] 린트(no-unused-vars): catch (err)의 err를 안 써서 삭제
-      alert(isEditMode ? '게시글 수정에 실패했습니다.' : '게시글 등록에 실패했습니다.');
-
+      await Swal.fire({
+        icon: 'error',
+        text: isEditMode ? '게시글 수정에 실패했습니다.' : '게시글 등록에 실패했습니다.',
+        confirmButtonColor: SWAL_ACCENT_COLOR,
+      });
+      
     } finally {
       setIsSubmitting(false);
     }

@@ -1,5 +1,5 @@
 // 담당: 임유빈
-// 커뮤니티 게시물 상세페이지 [아직 수정중] -
+// 커뮤니티 게시물 상세페이지 
 // [디자인 11/22 조현기] 시안 F 적용 — className(모양)만 바꿈, 좋아요 · 댓글 로직은 그대로
 //   1. 본문 상자: 흰 둥근 카드(rounded-card · shadow-card), 관련 레시피 · 댓글 상자는 둥근 회색 상자
 //   2. 댓글 등록 · 저장 등 주요 버튼: 검정 → 포인트색(accent), 버튼 · 입력칸은 알약 모양(rounded-pill)
@@ -20,6 +20,7 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';   // [�
 import api from '../api'; // [API 변경] mockPosts, mockPostComments 제거 후 공통 api 사용
 import { useAuth } from '../contexts/AuthContext';
 import { COMMENT_MAX } from '../constants';
+import Swal from 'sweetalert2';
 
 export default function BoardDetailPage({ onDeletePost }) { // [API 변경] posts = mockPosts 기본값 제거
   const { id } = useParams();
@@ -133,7 +134,11 @@ export default function BoardDetailPage({ onDeletePost }) { // [API 변경] post
   // [API 변경] 좋아요 추가(POST) / 취소(DELETE) API 호출
   const handleLikeToggle = async () => {
     if (!isAuthenticated) {
-      alert('로그인이 필요한 서비스입니다.');
+      await Swal.fire({
+        icon: 'info',
+        text: '로그인이 필요한 서비스입니다.',
+        confirmButtonColor: SWAL_ACCENT_COLOR,
+      });
       return;
     }
 
@@ -149,13 +154,27 @@ export default function BoardDetailPage({ onDeletePost }) { // [API 변경] post
         like_count: data.like_count,
       }));
     } catch {   // [수정 11/24 조현기] 린트(no-unused-vars): catch (err)의 err를 안 써서 삭제 (err 없이 catch {만 써도 됨)
-      alert('좋아요 처리에 실패했습니다.');
+      await Swal.fire({
+        icon: 'error',
+        text: '좋아요 처리에 실패했습니다.',
+        confirmButtonColor: SWAL_ACCENT_COLOR,
+      });
     }
   };
 
   // [API 변경] 게시글 삭제 API 호출
   const handleDeletePost = async () => {
-    if (!window.confirm('게시글을 삭제하시겠습니까?\n삭제 후에는 복구할 수 없습니다.')) return;
+    
+    const result = await Swal.fire({
+      icon: 'warning',
+      text: '게시글을 삭제하시겠습니까?\n삭제 후에는 복구할 수 없습니다.',
+      showCancelButton: true,
+      confirmButtonText: '삭제',
+      cancelButtonText: '취소',
+      confirmButtonColor: SWAL_ACCENT_COLOR,
+    });
+
+    if (!result.isConfirmed) return;
 
     try {
       await api.delete(`/posts/${post.post_id}`);
@@ -164,7 +183,11 @@ export default function BoardDetailPage({ onDeletePost }) { // [API 변경] post
       }
       navigate('/board');
     } catch {   // [수정 11/24 조현기] 린트(no-unused-vars): catch (err)의 err를 안 써서 삭제 (err 없이 catch {만 써도 됨)
-      alert('게시글 삭제에 실패했습니다.');
+      await Swal.fire({
+        icon: 'error',
+        text: '게시글 삭제에 실패했습니다.',
+        confirmButtonColor: SWAL_ACCENT_COLOR,
+      });
     }
   };
 
@@ -172,7 +195,11 @@ export default function BoardDetailPage({ onDeletePost }) { // [API 변경] post
   const handleAddComment = async (e) => {
     e.preventDefault();
     if (!isAuthenticated) {
-      alert('로그인이 필요합니다.');
+      await Swal.fire({
+        icon: 'info',
+        text: '로그인이 필요합니다.',
+        confirmButtonColor: SWAL_ACCENT_COLOR,
+      });
       navigate('/login', { state: { from: location.pathname } });   // [수정 11/24 조현기] 로그인하면 이 게시글로 돌아옴
       return;
     }
@@ -186,19 +213,37 @@ export default function BoardDetailPage({ onDeletePost }) { // [API 변경] post
       setComments((prev) => [created, ...prev]);
       setNewComment('');
     } catch {   // [수정 11/24 조현기] 린트(no-unused-vars): catch (err)의 err를 안 써서 삭제 (err 없이 catch {만 써도 됨)
-      alert('댓글 등록에 실패했습니다.');
+      await Swal.fire({
+        icon: 'error',
+        text: '댓글 등록에 실패했습니다.',
+        confirmButtonColor: SWAL_ACCENT_COLOR,
+      });
     }
   };
 
   // [API 변경] 댓글 삭제 API 호출
   const handleDeleteComment = async (pc_id) => {
-    if (!window.confirm('댓글을 삭제하시겠습니까?')) return;
+
+    const result = await Swal.fire({
+        icon: 'warning',
+        text: '댓글을 삭제하시겠습니까?',
+        showCancelButton: true,
+        confirmButtonText: '삭제',
+        cancelButtonText: '취소',
+        confirmButtonColor: '#C85A32',
+      });
+
+    if (!result.isConfirmed) return;
 
     try {
       await api.delete(`/post-comments/${pc_id}`);
       setComments((prev) => prev.filter((c) => c.pc_id !== pc_id));
     } catch {   // [수정 11/24 조현기] 린트(no-unused-vars): catch (err)의 err를 안 써서 삭제 (err 없이 catch {만 써도 됨)
-      alert('댓글 삭제에 실패했습니다.');
+      await Swal.fire({
+        icon: 'error',
+        text: '댓글 삭제에 실패했습니다.',
+        confirmButtonColor: SWAL_ACCENT_COLOR,
+      });
     }
   };
 
@@ -220,7 +265,11 @@ export default function BoardDetailPage({ onDeletePost }) { // [API 변경] post
       setEditingCommentId(null);
       setEditText('');
     } catch {   // [수정 11/24 조현기] 린트(no-unused-vars): catch (err)의 err를 안 써서 삭제 (err 없이 catch {만 써도 됨)
-      alert('댓글 수정에 실패했습니다.');
+      await Swal.fire({
+        icon: 'error',
+        text: '댓글 수정에 실패했습니다.',
+        confirmButtonColor: SWAL_ACCENT_COLOR,
+      });
     }
   };
 
@@ -376,23 +425,27 @@ function formatBoardDate(dateValue) {
             <form onSubmit={handleAddComment} className="flex items-center gap-2 mb-6">
               <input
                 type="text"
-                placeholder={isAuthenticated ? "댓글을 입력하세요 (최대 500자)" : "로그인 후 댓글을 남겨보세요"}
+                placeholder={isAuthenticated ? '댓글을 입력하세요 (최대 500자)' : '로그인 후 댓글을 남겨보세요'}
                 value={newComment}
                 maxLength={COMMENT_MAX}
                 disabled={!isAuthenticated}
                 onChange={(e) => setNewComment(e.target.value)}
                 className="min-w-0 flex-1 border rounded-pill px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent disabled:bg-gray-100"
               />
-              {/* 실시간 댓글 글자수 카운터 / 제한 수  추가*/}
               <span className="flex-none whitespace-nowrap text-xs text-gray-400">
                 {newComment.length} / {COMMENT_MAX}자
               </span>
               <button
-                type="submit"
-                disabled={!isAuthenticated || !newComment.trim()}
+                type={isAuthenticated ? 'submit' : 'button'}
+                onClick={
+                  !isAuthenticated
+                    ? () => navigate('/login', { state: { from: location.pathname } })
+                    : undefined
+                }
+                disabled={isAuthenticated && !newComment.trim()}
                 className="flex-none whitespace-nowrap bg-accent text-white px-4 py-2 rounded-pill text-sm font-medium hover:bg-accent-dark transition-colors disabled:bg-gray-300"
               >
-                등록
+                {isAuthenticated ? '등록' : '로그인 후 등록'}
               </button>
             </form>
 
