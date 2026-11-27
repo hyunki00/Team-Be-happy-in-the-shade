@@ -9,6 +9,10 @@
   자취생 · 1인 가구를 위한 서비스 · 팀 <b>그늘에있으면기분이해피하조</b> · 2026.11.03 – 11.27
 </p>
 
+<p align="center">
+  <a href="https://hyun1208.atlassian.net/browse/QYEB"><img src="https://img.shields.io/badge/Jira-%EC%9D%BC%EC%A0%95%20%EA%B4%80%EB%A6%AC-0052CC?style=for-the-badge&logo=jira&logoColor=white" alt="Jira"></a>
+</p>
+
 ---
 
 ## 목차
@@ -55,7 +59,7 @@
 | **백엔드** | Python · FastAPI · SQLAlchemy 2 (async, asyncmy) · Pydantic Settings · JWT (PyJWT, 쿠키 인증) · passlib(bcrypt) · Pillow |
 | **데이터베이스** | MySQL (테이블 20개) |
 | **데이터** | 식품의약품안전처 조리식품 레시피 DB (레시피 773개, 식재료 1,039개) |
-| **협업** | GitHub (브랜치 · PR) · Jira · Confluence · Notion |
+| **협업** | GitHub (브랜치 · PR) · [Jira](https://hyun1208.atlassian.net/browse/QYEB) · Confluence · Notion |
 
 - **SweetAlert2**: 삭제 · 로그아웃처럼 되돌리기 어려운 동작 전 확인 창, 등록 성공 · 실패 알림
 - **사진**: 업로드한 사진은 `backend/uploads`에 저장하고 DB에는 주소만 저장. 레시피 목록용 썸네일(WebP)은 `frontend/public/thumbs`
@@ -208,7 +212,7 @@ npm run dev
 - **올리지 않는 것**: `.env`, `node_modules`, `venv`, `__pycache__`
 - `git push --force` 금지
 - 이름 규칙: 컴포넌트 PascalCase, 변수 · 함수 camelCase, Python · DB · API 필드 snake_case
-- 일정 · 할 일은 Jira, 회의록은 Confluence, 문서(API 명세 · 컴포넌트 정리 · DB 설계)는 Notion
+- 일정 · 할 일은 [Jira](https://hyun1208.atlassian.net/browse/QYEB) (프로젝트 키 `QYEB`, 1~4주차 카드 37장), 회의록은 Confluence, 문서(API 명세 · 컴포넌트 정리 · DB 설계)는 Notion
 
 ## 진행 기록
 
